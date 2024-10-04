@@ -1,8 +1,11 @@
 package memberlist
 
 import (
+	"io"
 	"net"
 	"time"
+
+	"github.com/hashicorp/go-msgpack/v2/codec"
 )
 
 type msgType int
@@ -45,6 +48,10 @@ func (t *NetTransport) Shutdown() {}
 
 func (m *Memberlist) sendMsgTcp(conn net.Conn, msg []byte, streamLabel string) error {
 	return nil
+}
+
+func (m *Memberlist) readStream(conn net.Conn, streamLabel string) (msgType, io.Reader, *codec.Decoder, error) {
+	return 0, nil, nil, nil
 }
 
 func (m *Memberlist) sendMsgUdp(a net.Addr, msg []byte) error {
