@@ -61,7 +61,3 @@ func (m *Memberlist) sendMsgUdp(a net.Addr, msg []byte) error {
 func (m *Memberlist) sendMsgPiggyback(a net.Addr, msg []byte) error {
 	return nil
 }
-
-func makeCompoundMsg(msgs [][]byte) []byte {
-	return nil
-}
