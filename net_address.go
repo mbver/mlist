@@ -20,6 +20,14 @@ func (m *Memberlist) resolveAddr(hostStr string) ([]ipPort, error) {
 	return nil, nil
 }
 
+func hasPort(s string) bool {
+	return false
+}
+
+func ensurePort(s string, port int) string {
+	return ""
+}
+
 func (m *Memberlist) getAdvertise() (net.IP, uint16) {
 	return nil, 0
 }
