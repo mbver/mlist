@@ -10,13 +10,13 @@ import (
 // call it broadcast or broadcastItem?
 type TransmitCapItem struct {
 	name      string
-	id        int
+	id        uint64
 	transmits int
 	msg       []byte
 	notify    chan<- struct{}
 }
 
-func (i *TransmitCapItem) ID() int {
+func (i *TransmitCapItem) ID() uint64 {
 	return i.id
 }
 
@@ -44,7 +44,7 @@ type TransmitCapQueue struct {
 	l             sync.Mutex
 	queue         heap.Heap
 	exists        map[string]*TransmitCapItem
-	idSeq         int64
+	idSeq         uint64
 }
 
 func (m *Memberlist) NewBroadcastQueue() *TransmitCapQueue {
@@ -57,39 +57,36 @@ func (m *Memberlist) NewBroadcastQueue() *TransmitCapQueue {
 }
 
 func (q *TransmitCapQueue) GetMessages(overhead, limit int) [][]byte {
-	if limit <= overhead {
+	if limit <= overhead || q.Len() == 0 {
 		return nil
 	}
 	q.l.Lock()
 	defer q.l.Unlock()
-	if q.Len() == 0 {
-		return nil
-	}
 	var (
 		bytesUsed int
 		picked    []*TransmitCapItem
 		notPicked []*TransmitCapItem
+		free      int
 	)
 	var item *TransmitCapItem
-	var free int
-	for q.queue.Len() != 0 {
-		free = limit - bytesUsed - overhead
-		if free <= 0 {
+	for {
+		free = limit - bytesUsed
+		// TODO: has a minimum threshold to avoid popping all the msgs!
+		item = q.Pop()
+		if item == nil {
 			break
 		}
-		item = q.queue.Pop().(*TransmitCapItem)
 		if len(item.msg) > free {
 			notPicked = append(notPicked, item)
+			free += overhead
 			continue
 		}
 		picked = append(picked, item)
-		bytesUsed += len(item.msg)
+		bytesUsed += (len(item.msg) + overhead)
 	}
-
 	for _, item := range notPicked {
-		q.queueItem(item)
+		q.Push(item)
 	}
-
 	transLimit := transmitLimit(q.TransmitScale, q.NumNodes())
 	msgs := [][]byte{}
 	for _, item := range picked {
@@ -99,8 +96,11 @@ func (q *TransmitCapQueue) GetMessages(overhead, limit int) [][]byte {
 		if item.transmits >= transLimit {
 			item.Finish()
 		} else {
-			q.queueItem(item)
+			q.Push(item)
 		}
+	}
+	if q.queue.Len() == 0 {
+		q.idSeq = 0 // reset counter when no msg in queue
 	}
 	return msgs
 }
@@ -111,6 +111,9 @@ func transmitLimit(scale, n int) int {
 }
 
 func (q *TransmitCapQueue) QueueMsg(name string, t msgType, msg []byte, notify chan<- struct{}) {
+	q.l.Lock()
+	defer q.l.Unlock()
+
 	msg, err := encode(t, msg)
 	if err != nil {
 		// log error
@@ -121,31 +124,39 @@ func (q *TransmitCapQueue) QueueMsg(name string, t msgType, msg []byte, notify c
 		msg:    msg,
 		notify: notify,
 	}
-	q.l.Lock()
-	item.id = int(q.idSeq)
+	item.id = q.idSeq
 	if q.idSeq == math.MaxInt64 { // wrap around
 		q.idSeq = 0
 	}
 	q.idSeq++
-	q.l.Unlock()
 
-	q.queueItem(item)
+	q.Push(item)
 }
 
-func (q *TransmitCapQueue) queueItem(item *TransmitCapItem) {
-	q.l.Lock()
-	defer q.l.Unlock()
-
+// caller has to hold the lock
+func (q *TransmitCapQueue) Push(item *TransmitCapItem) {
 	if item.name != "" {
 		if old, ok := q.exists[item.name]; ok {
 			old.Finish()
-			q.queue.Remove(old)
+			q.queue.Remove(old.ID())
 		}
 		q.exists[item.name] = item
 	}
 	q.queue.Push(item)
 }
 
+func (q *TransmitCapQueue) Pop() *TransmitCapItem {
+	item := q.queue.Pop()
+	if item == nil {
+		return nil
+	}
+	res := item.(*TransmitCapItem)
+	delete(q.exists, res.name)
+	return res
+}
+
 func (q *TransmitCapQueue) Len() int {
+	q.l.Lock()
+	defer q.l.Unlock()
 	return q.queue.Len()
 }

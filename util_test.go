@@ -1,6 +1,8 @@
 package memberlist
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestEncodeDecode(t *testing.T) {
 	msg := &ping{SeqNo: 100}
