@@ -2,13 +2,13 @@ package memberlist
 
 import "bytes"
 
-type compress struct{}
+type compressor struct{}
 
-func (c *compress) decompress() ([]byte, error) {
+func (c *compressor) decompress() ([]byte, error) {
 	return nil, nil
 }
 
-func compressMsg(msg []byte) (*bytes.Buffer, error) {
+func compress(msg []byte) (*bytes.Buffer, error) {
 	return nil, nil
 }
 

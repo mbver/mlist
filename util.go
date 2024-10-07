@@ -11,7 +11,7 @@ func init() {
 	seed.Init()
 
 }
-func encode(t msgType, in interface{}) (*bytes.Buffer, error) {
+func encode(t msgType, in interface{}) ([]byte, error) {
 	return nil, nil
 }
 
