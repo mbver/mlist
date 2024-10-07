@@ -5,6 +5,13 @@ import (
 	"time"
 )
 
+type ping struct {
+	SeqNo      uint32
+	Node       string
+	SourceAddr []byte `codec:",omitempty"`
+	SourcePort uint16 `codec:",omitempty"`
+}
+
 // include buddy mechanism. they are almost the same
 func (m *Memberlist) Ping(node *nodeState) bool {
 	return false

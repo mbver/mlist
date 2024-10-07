@@ -3,6 +3,7 @@ package memberlist
 import (
 	"bytes"
 
+	"github.com/hashicorp/go-msgpack/v2/codec"
 	"github.com/sean-/seed"
 )
 
@@ -12,11 +13,21 @@ func init() {
 
 }
 func encode(t msgType, in interface{}) ([]byte, error) {
-	return nil, nil
+	buf := bytes.NewBuffer(nil)
+	buf.WriteByte(uint8(t))
+	h := codec.MsgpackHandle{}
+	enc := codec.NewEncoder(buf, &h)
+	if err := enc.Encode(in); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 func decode(buf []byte, out interface{}) error {
-	return nil
+	r := bytes.NewReader(buf)
+	h := codec.MsgpackHandle{}
+	dec := codec.NewDecoder(r, &h)
+	return dec.Decode(out)
 }
 
 func makeCompoundMsg(msgs [][]byte) []byte {
