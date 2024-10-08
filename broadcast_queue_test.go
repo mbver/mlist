@@ -61,36 +61,26 @@ func TestBroadcast_QueueMsg(t *testing.T) {
 	q.QueueMsg("b", 0, nil, nil)
 	q.QueueMsg("c", 0, nil, nil)
 
-	if q.Len() != 3 {
-		t.Fatalf("bad length")
-	}
+	require.Equal(t, 3, q.Len(), "bad queue length")
+
 	dump := dumpQueue(q)
-	if dump[0].name != "c" {
-		t.Errorf("item 0 expect %s, got %s", "c", dump[0].name)
-	}
-	if dump[1].name != "b" {
-		t.Errorf("item 1 expect %s, got %s", "b", dump[1].name)
-	}
-	if dump[2].name != "a" {
-		t.Errorf("item 2 expect %s, got %s", "a", dump[2].name)
-	}
+
+	require.Equal(t, "c", dump[0].name, "item 0 is not c")
+	require.Equal(t, 2, len(dump[0].msg), "bad msg length")
+	require.Equal(t, "b", dump[1].name, "item 1 is not b")
+	require.Equal(t, "a", dump[2].name, "item 2 is not a")
 
 	// should invalidate old msg
-	q.QueueMsg("c", 0, nil, nil)
+	q.QueueMsg("c", 0, []byte("msg"), nil)
 
-	if q.Len() != 3 {
-		t.Fatalf("bad length, expect: %d, got: %d", 3, q.Len())
-	}
+	require.Equal(t, 3, q.Len(), "bad queue length")
+
 	dump = dumpQueue(q)
-	if dump[0].name != "c" {
-		t.Errorf("item 0 expect %s, got %s", "c", dump[0].name)
-	}
-	if dump[1].name != "b" {
-		t.Errorf("item 1 expect %s, got %s", "b", dump[1].name)
-	}
-	if dump[2].name != "a" {
-		t.Errorf("item 2 expect %s, got %s", "a", dump[2].name)
-	}
+
+	require.Equal(t, "c", dump[0].name, "item 0 is not c")
+	require.Equal(t, 5, len(dump[0].msg), "bad msg length")
+	require.Equal(t, "b", dump[1].name, "item 1 is not b")
+	require.Equal(t, "a", dump[2].name, "item 2 is not a")
 }
 
 func TestBroadcast_GetMessages(t *testing.T) {
