@@ -56,8 +56,8 @@ func (m *Memberlist) NewBroadcastQueue() *TransmitCapQueue {
 	}
 }
 
-func (q *TransmitCapQueue) GetMessages(overhead, limit int) [][]byte {
-	if limit <= overhead || q.Len() == 0 {
+func (q *TransmitCapQueue) GetMessages(overhead, size int) [][]byte {
+	if size <= overhead || q.Len() == 0 {
 		return nil
 	}
 	q.l.Lock()
@@ -66,19 +66,16 @@ func (q *TransmitCapQueue) GetMessages(overhead, limit int) [][]byte {
 		bytesUsed int
 		picked    []*TransmitCapItem
 		notPicked []*TransmitCapItem
-		free      int
 	)
 	var item *TransmitCapItem
 	for {
-		free = limit - bytesUsed
 		// TODO: has a minimum threshold to avoid popping all the msgs!
 		item = q.Pop()
 		if item == nil {
 			break
 		}
-		if len(item.msg) > free {
+		if bytesUsed+len(item.msg)+overhead > size {
 			notPicked = append(notPicked, item)
-			free += overhead
 			continue
 		}
 		picked = append(picked, item)
