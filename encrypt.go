@@ -14,11 +14,15 @@ import (
 type encryptionVersion uint8
 
 const (
-	maxEncryptionVersion = 0
-	versionSize          = 1
-	nonceSize            = 12
-	tagSize              = 16
-	maxPushSize          = 20 * 1024 * 1024
+	encryptVersion       encryptionVersion = 0
+	maxEncryptionVersion                   = 0
+)
+
+const (
+	versionSize = 1
+	nonceSize   = 12
+	tagSize     = 16
+	maxPushSize = 20 * 1024 * 1024
 )
 
 func encryptOverhead(vsn encryptionVersion) int {
@@ -30,7 +34,7 @@ func encryptOverhead(vsn encryptionVersion) int {
 	}
 }
 
-// vsn-nonce-ciphertext-tag
+// encrypt outputs vsn-nonce-ciphertext-tag
 func encrypt(vsn encryptionVersion, key []byte, msg []byte, aad []byte) ([]byte, error) {
 	// Get the AES block cipher
 	aesBlock, err := aes.NewCipher(key)

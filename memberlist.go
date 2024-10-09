@@ -2,7 +2,10 @@ package memberlist
 
 import "time"
 
-type Memberlist struct{}
+type Memberlist struct {
+	config  *Config
+	keyring *Keyring
+}
 
 type MemberlistBuilder struct{}
 
