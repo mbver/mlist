@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-msgpack/v2/codec"
+	"github.com/hashicorp/go-sockaddr"
 )
 
 func (m *Memberlist) packUdp(msg []byte) ([]byte, error) {
@@ -407,4 +408,62 @@ func (m *Memberlist) sendMsgPiggyback(addr string, msg []byte) error {
 	msgs = append(msgs, piggy...)
 	compound := makeCompoundMsg(msgs)
 	return m.sendUdp(addr, compound)
+}
+
+func (t *NetTransport) GetFirstAddr() (net.IP, int, error) {
+	var ip net.IP
+	// if we are listening on all interfaces, choose a private interface's address
+	if t.bindAddrs[0] == "0.0.0.0" {
+		var err error
+		ipStr, err := sockaddr.GetPrivateIP()
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to get interface addresses: %v", err)
+		}
+		if ipStr == "" {
+			return nil, 0, fmt.Errorf("no private IP address found, and explicit IP not provided")
+		}
+
+		ip = net.ParseIP(ipStr)
+		if ip == nil {
+			return nil, 0, fmt.Errorf("failed to parse advertise address: %q", ip)
+		}
+	} else {
+		ip = t.tcpListeners[0].Addr().(*net.TCPAddr).IP
+	}
+
+	return ip, t.bindPort, nil
+}
+
+// execute just ONCE, right after NetTransport.Start()
+func (m *Memberlist) finalizeAdvertiseAddr() error {
+	var ip net.IP
+	var port int
+	if m.config.AdvertiseAddr != "" {
+		ip = net.ParseIP(m.config.AdvertiseAddr)
+		if ip == nil {
+			return fmt.Errorf("failed to parse advertise address %q", m.config.AdvertiseAddr)
+		}
+		// convert to IPv4 if possible.
+		if ip4 := ip.To4(); ip4 != nil {
+			ip = ip4
+		}
+		port = m.config.AdvertisePort
+	} else {
+		var err error
+		ip, port, err = m.transport.GetFirstAddr()
+		if err != nil {
+			return nil
+		}
+	}
+	m.config.AdvertiseAddr = ip.String()
+	m.config.AdvertisePort = port
+	return nil
+}
+
+func (m *Memberlist) GetAdvertiseAddr() (net.IP, int, error) {
+	ip := net.ParseIP(m.config.AdvertiseAddr)
+	if ip == nil {
+		return nil, 0, fmt.Errorf("failed to parse advertise address %q", m.config.AdvertiseAddr)
+	}
+	return ip, m.config.AdvertisePort, nil
 }
