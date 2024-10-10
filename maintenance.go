@@ -38,3 +38,26 @@ func (m *Memberlist) scheduleFuncDynamic(interval time.Duration, stopCh chan str
 		}
 	}
 }
+
+func (m *Memberlist) gossip() {}
+
+func (m *Memberlist) pickRandomNodes(num int, accept func(*nodeState) bool) []Node {
+	return nil
+}
+
+func (m *Memberlist) probe() {}
+
+func (m *Memberlist) nextProbeNode() (*nodeState, error) {
+	return nil, nil
+}
+
+func (m *Memberlist) probeNode(node *nodeState) {}
+
+// reap
+func (m *Memberlist) resetNodes() {}
+
+func (m *Memberlist) swapExpiredToEnd(nodes []*nodeState, timeout time.Duration) int {
+	return 0
+}
+
+// reconnect

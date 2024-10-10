@@ -9,6 +9,8 @@ const (
 	StateLeft
 )
 
+type Node struct{}
+
 type nodeState struct{}
 
 type alive struct{}
