@@ -467,3 +467,21 @@ func (m *Memberlist) GetAdvertiseAddr() (net.IP, int, error) {
 	}
 	return ip, m.config.AdvertisePort, nil
 }
+
+func (m *Memberlist) isAddrAllowed(a net.Addr) error {
+	return nil
+}
+
+func (m *Memberlist) IsIPAllowed(ip net.IP) error {
+	return nil
+}
+
+func ParseCIDRs(v []string) ([]net.IPNet, error) {
+	return nil, nil
+}
+
+type ipPort struct{}
+
+func (m *Memberlist) resolveAddr(hostStr string) ([]ipPort, error) {
+	return nil, nil
+}
