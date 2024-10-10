@@ -103,6 +103,7 @@ func TestKeyring_AddRemoveUse(t *testing.T) {
 func TestKeyRing_MultiKeyEncryptDecrypt(t *testing.T) {
 	plaintext := []byte("this is a plain text message")
 	extra := []byte("random data")
+	vsn := encryptionVersion(0)
 
 	keyring, err := NewKeyring(TestKeys, TestKeys[0])
 	if err != nil {
@@ -110,7 +111,7 @@ func TestKeyRing_MultiKeyEncryptDecrypt(t *testing.T) {
 	}
 
 	// First encrypt using the primary key and make sure we can decrypt
-	encrypted, err := encrypt(encryptVersion, TestKeys[0], plaintext, extra)
+	encrypted, err := encrypt(vsn, TestKeys[0], plaintext, extra)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -126,7 +127,7 @@ func TestKeyRing_MultiKeyEncryptDecrypt(t *testing.T) {
 
 	// Now encrypt with a secondary key and try decrypting again.
 
-	encrypted, err = encrypt(encryptVersion, TestKeys[2], plaintext, extra)
+	encrypted, err = encrypt(vsn, TestKeys[2], plaintext, extra)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}

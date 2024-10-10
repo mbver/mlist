@@ -35,3 +35,7 @@ func (m *Memberlist) getAdvertise() (net.IP, uint16) {
 func (m *Memberlist) setAdvertise(addr net.IP, port int) {}
 
 // advertise address is still a mess with net transport.
+
+func (t *NetTransport) GetAdvertiseAddr() (net.IP, int, error) {
+	return nil, 0, nil
+}

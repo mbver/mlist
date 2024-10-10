@@ -8,6 +8,25 @@ import (
 	"github.com/hashicorp/go-msgpack/v2/codec"
 )
 
+type msgType int
+
+const (
+	pingMsg msgType = iota
+	indirectPingMsg
+	ackRespMsg
+	suspectMsg
+	aliveMsg
+	deadMsg
+	pushPullMsg
+	compoundMsg
+	userMsg // User mesg, not handled by us
+	compressMsg
+	encryptMsg
+	nackRespMsg
+	hasCrcMsg
+	errMsg
+)
+
 func (m *Memberlist) receiveTcpConn() {}
 
 func (m *Memberlist) handleTcpConn(conn net.Conn) {}

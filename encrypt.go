@@ -14,8 +14,7 @@ import (
 type encryptionVersion uint8
 
 const (
-	encryptVersion       encryptionVersion = 0
-	maxEncryptionVersion                   = 0
+	maxEncryptionVersion encryptionVersion = 0
 )
 
 const (
@@ -24,6 +23,10 @@ const (
 	tagSize     = 16
 	maxPushSize = 20 * 1024 * 1024
 )
+
+func (m *Memberlist) EncryptionEnabled() bool {
+	return m.keyring != nil && len(m.keyring.GetKeys()) > 0
+}
 
 func encryptOverhead(vsn encryptionVersion) int {
 	switch vsn {

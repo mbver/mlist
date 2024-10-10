@@ -1,6 +1,7 @@
 package memberlist
 
 import (
+	"bytes"
 	"testing"
 )
 
@@ -16,5 +17,21 @@ func TestEncodeDecode(t *testing.T) {
 	}
 	if msg.SeqNo != out.SeqNo {
 		t.Fatalf("bad sequence no")
+	}
+}
+
+func TestCompressDecompress(t *testing.T) {
+	buf, err := compress([]byte("testing"))
+	if err != nil {
+		t.Fatalf("unexpected err: %s", err)
+	}
+
+	decomp, err := decompressMsg(buf[1:])
+	if err != nil {
+		t.Fatalf("unexpected err: %s", err)
+	}
+
+	if !bytes.Equal(decomp, []byte("testing")) {
+		t.Fatalf("bad payload: %v", decomp)
 	}
 }

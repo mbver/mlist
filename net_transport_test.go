@@ -16,6 +16,7 @@ func setUpPackTest() (*Memberlist, error) {
 		return nil, err
 	}
 	conf := &Config{
+		Label:             "label",
 		EnableCompression: true,
 	}
 	return &Memberlist{
@@ -30,7 +31,7 @@ func TestNetPacking_PackUnpackUDP(t *testing.T) {
 	msg := []byte("this is a message")
 	label := "label"
 
-	packed, err := m.packMsgUdp(msg, label)
+	packed, err := m.packUdp(msg)
 	require.Nil(t, err, "pack msg failed")
 
 	unpacked, err := m.unpackPacket(packed, label)
@@ -75,7 +76,7 @@ func TestNetPacking_PackUnpackTCP(t *testing.T) {
 
 	label := "label"
 
-	packed, err := m.packMsgTcp(encoded, label)
+	packed, err := m.packTcp(encoded, label)
 	require.Nil(t, err, "pack msg tcp failed")
 
 	conn := NewMockConn()
