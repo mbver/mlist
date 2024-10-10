@@ -157,3 +157,37 @@ func (q *TransmitCapQueue) Len() int {
 	defer q.l.Unlock()
 	return q.queue.Len()
 }
+
+const userMsgOverhead = 1
+
+type UserBroadcasts interface {
+	GetBroadcasts(overhead, limit int) [][]byte
+}
+
+// get broadcasts from memberlist and consumer
+func (m *Memberlist) getBroadcasts(overhead, limit int) [][]byte {
+	if limit <= overhead {
+		return nil
+	}
+	msgs := m.mbroadcasts.GetMessages(overhead, limit)
+	if m.ubroadcasts != nil {
+		bytesUsed := 0
+		for _, msg := range msgs {
+			bytesUsed += len(msg) + overhead
+		}
+		limit = limit - bytesUsed
+		umsgs := m.ubroadcasts.GetBroadcasts(overhead+userMsgOverhead, limit)
+		for _, msg := range umsgs {
+			buf := make([]byte, 1, len(msg)+1)
+			buf[0] = byte(userMsg)
+			buf = append(buf, msg...)
+			msgs = append(msgs, buf)
+		}
+	}
+	return msgs
+}
+
+// name is used to invalidate message, name = "" will not invalidate
+func (m *Memberlist) broadcast(name string, t msgType, msg []byte, notify chan<- struct{}) {
+	m.mbroadcasts.QueueMsg(name, t, msg, notify)
+}

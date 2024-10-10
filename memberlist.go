@@ -3,8 +3,11 @@ package memberlist
 import "time"
 
 type Memberlist struct {
-	config  *Config
-	keyring *Keyring
+	config      *Config
+	keyring     *Keyring
+	transport   *NetTransport
+	mbroadcasts *TransmitCapQueue
+	ubroadcasts UserBroadcasts
 }
 
 type MemberlistBuilder struct{}
