@@ -169,14 +169,6 @@ const (
 	lenMsgOverhead         = 2 // len(msg), uint16
 )
 
-type NetTransportConfig struct {
-	// for both TCP and UDP
-	BindAddrs []string
-	// for all addresses above
-	BindPort int
-	Logger   *log.Logger
-}
-
 type Packet struct {
 	Buf       []byte
 	From      net.Addr
@@ -184,7 +176,8 @@ type Packet struct {
 }
 
 type NetTransport struct {
-	config       *NetTransportConfig
+	bindAddrs    []string
+	bindPort     int
 	logger       *log.Logger
 	packetCh     chan *Packet
 	udpConns     []*net.UDPConn
@@ -194,19 +187,21 @@ type NetTransport struct {
 	shutdown     int32
 }
 
-func NewNetTransport(config *NetTransportConfig) (*NetTransport, error) {
-	if len(config.BindAddrs) == 0 {
+func NewNetTransport(addrs []string, port int, logger *log.Logger) (*NetTransport, error) {
+	if len(addrs) == 0 {
 		return nil, fmt.Errorf("at least one bind address is required")
 	}
 
-	var ok bool
-	t := NetTransport{
-		config:    config,
+	return &NetTransport{
+		bindAddrs: addrs,
+		bindPort:  port,
 		packetCh:  make(chan *Packet),
 		tcpConnCh: make(chan net.Conn),
-		logger:    config.Logger,
-	}
+	}, nil
+}
 
+func (t *NetTransport) Start() error {
+	var ok bool
 	// Clean up listeners if there's an error.
 	defer func() {
 		if !ok {
@@ -215,42 +210,40 @@ func NewNetTransport(config *NetTransportConfig) (*NetTransport, error) {
 	}()
 
 	// create tcp and udp listeners on its addresses and port
-	port := config.BindPort
-	for _, addr := range config.BindAddrs {
+	for _, addr := range t.bindAddrs {
 		ip := net.ParseIP(addr)
 
-		tcpAddr := &net.TCPAddr{IP: ip, Port: port}
+		tcpAddr := &net.TCPAddr{IP: ip, Port: t.bindPort}
 		tcpLn, err := net.ListenTCP("tcp", tcpAddr)
 		if err != nil {
-			return nil, fmt.Errorf("failed to start TCP listener on %q port %d: %v", addr, port, err)
+			return fmt.Errorf("failed to start TCP listener on %q port %d: %v", addr, t.bindPort, err)
 		}
 		t.tcpListeners = append(t.tcpListeners, tcpLn)
 
 		// if port == 0, use the dynamic port assigned by OS
-		if port == 0 {
-			config.BindPort = tcpLn.Addr().(*net.TCPAddr).Port
-			port = config.BindPort
+		if t.bindPort == 0 {
+			t.bindPort = tcpLn.Addr().(*net.TCPAddr).Port
 		}
 
-		udpAddr := &net.UDPAddr{IP: ip, Port: port}
+		udpAddr := &net.UDPAddr{IP: ip, Port: t.bindPort}
 		udpConn, err := net.ListenUDP("udp", udpAddr)
 		if err != nil {
-			return nil, fmt.Errorf("failed to start UDP listener on %q port %d: %v", addr, port, err)
+			return fmt.Errorf("failed to start UDP listener on %q port %d: %v", addr, t.bindPort, err)
 		}
 		if err := setUDPSocketBuf(udpConn); err != nil {
-			return nil, fmt.Errorf("failed to resize UDP buffer: %v", err)
+			return fmt.Errorf("failed to resize UDP buffer: %v", err)
 		}
 		t.udpConns = append(t.udpConns, udpConn)
 	}
 
 	// start listening on incoming requests
-	for i := 0; i < len(config.BindAddrs); i++ {
+	for i := 0; i < len(t.bindAddrs); i++ {
 		t.wg.Add(2)
 		go t.tcpListen(t.tcpListeners[i])
 		go t.udpListen(t.udpConns[i])
 	}
 	ok = true
-	return &t, nil
+	return nil
 }
 
 // try to set udp socket buffer size to its largest value
