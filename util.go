@@ -35,7 +35,7 @@ func decode(buf []byte, out interface{}) error {
 }
 
 // compoundMsg = type-len(msgs)-[]len(msg)-[]msg
-func makeCompoundMsg(msgs [][]byte) []byte {
+func packCompoundMsg(msgs [][]byte) []byte {
 	buf := bytes.NewBuffer(nil)
 	buf.WriteByte(uint8(compoundMsg))
 	buf.WriteByte(uint8(len(msgs)))
@@ -48,12 +48,44 @@ func makeCompoundMsg(msgs [][]byte) []byte {
 	return buf.Bytes()
 }
 
-func makeCompoundMsgs(msgs [][]byte) []*bytes.Buffer {
-	return nil
+func unpackCompoundMsg(msg []byte) (trunc int, parts [][]byte, err error) {
+	if len(msg) < 1 {
+		err = fmt.Errorf("missing compound length byte")
+		return
+	}
+	numParts := int(msg[0])
+	msg = msg[1:]
+
+	// Check we have enough bytes
+	if len(msg) < numParts*2 {
+		err = fmt.Errorf("truncated len slice")
+		return
+	}
+
+	// Decode the lengths
+	lengths := make([]uint16, numParts)
+	for i := 0; i < numParts; i++ {
+		lengths[i] = binary.BigEndian.Uint16(msg[i*2 : i*2+2])
+	}
+	msg = msg[numParts*2:]
+
+	// Split each message
+	for idx, msgLen := range lengths {
+		if len(msg) < int(msgLen) {
+			trunc = numParts - idx
+			return
+		}
+
+		// Extract the slice, seek past on the buffer
+		slice := msg[:msgLen]
+		msg = msg[msgLen:]
+		parts = append(parts, slice)
+	}
+	return
 }
 
-func decodeCompoundMsg(buf []byte) (trunc int, parts [][]byte, err error) {
-	return 0, nil, nil
+func makeCompoundMsgs(msgs [][]byte) []*bytes.Buffer {
+	return nil
 }
 
 func randIdxN(n int) int {
