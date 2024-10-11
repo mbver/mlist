@@ -48,7 +48,7 @@ func packCompoundMsg(msgs [][]byte) []byte {
 	return buf.Bytes()
 }
 
-func unpackCompoundMsg(msg []byte) (trunc int, parts [][]byte, err error) {
+func unpackCompoundMsg(msg []byte) (trunc int, msgs [][]byte, err error) {
 	if len(msg) < 1 {
 		err = fmt.Errorf("missing compound length byte")
 		return
@@ -79,7 +79,7 @@ func unpackCompoundMsg(msg []byte) (trunc int, parts [][]byte, err error) {
 		// Extract the slice, seek past on the buffer
 		slice := msg[:msgLen]
 		msg = msg[msgLen:]
-		parts = append(parts, slice)
+		msgs = append(msgs, slice)
 	}
 	return
 }

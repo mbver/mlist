@@ -49,17 +49,17 @@ func TestCompounMsg_PackUnpack(t *testing.T) {
 	compound := packCompoundMsg(msgs)
 	require.Equal(t, msgType(compound[0]), compoundMsg, "compoundMsg type")
 
-	trunc, parts, err := unpackCompoundMsg(compound[1:])
+	trunc, msgs, err := unpackCompoundMsg(compound[1:])
 	if err != nil {
 		t.Fatalf("unexpected err: %s", err)
 	}
 	if trunc != 0 {
 		t.Fatalf("should not truncate")
 	}
-	if len(parts) != 3 {
+	if len(msgs) != 3 {
 		t.Fatalf("bad parts")
 	}
-	for _, p := range parts {
+	for _, p := range msgs {
 		if !bytes.Equal(encoded, p) {
 			t.Errorf("unmatched msg after unpacking")
 		}
@@ -72,22 +72,20 @@ func TestCompoundMsg_MissingBytes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected err: %s", err)
 	}
-
 	msgs := [][]byte{encoded, encoded, encoded}
 	compound := packCompoundMsg(msgs)
 	require.Equal(t, msgType(compound[0]), compoundMsg, "compoundMsg type")
-
-	trunc, parts, err := unpackCompoundMsg(compound[1:38])
+	trunc, msgs, err := unpackCompoundMsg(compound[1:38]) // len(compound) = 53, missing 15 bytes. len(encoded) = 15
 	if err != nil {
 		t.Fatalf("unexpected err: %s", err)
 	}
 	if trunc != 1 {
 		t.Fatalf("should not truncate")
 	}
-	if len(parts) != 2 {
+	if len(msgs) != 2 {
 		t.Fatalf("bad parts")
 	}
-	for _, p := range parts {
+	for _, p := range msgs {
 		if !bytes.Equal(encoded, p) {
 			t.Errorf("unmatched msg after unpacking")
 		}

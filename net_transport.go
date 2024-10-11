@@ -406,7 +406,7 @@ func (m *Memberlist) sendMsgPiggyback(addr string, msg []byte) error {
 	msgs := make([][]byte, 0, 1+len(piggy))
 	msgs = append(msgs, msg)
 	msgs = append(msgs, piggy...)
-	compound := makeCompoundMsg(msgs)
+	compound := packCompoundMsg(msgs)
 	return m.sendUdp(addr, compound)
 }
 
