@@ -94,3 +94,7 @@ func TestNetPacking_PackUnpackTCP(t *testing.T) {
 		t.Fatalf("unmatched unpack msg stream, expect: %s, got: %s", msg, out)
 	}
 }
+
+func TestNetTransport_SendReceive(t *testing.T) {
+
+}
