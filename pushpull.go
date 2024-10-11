@@ -29,6 +29,10 @@ func (m *Memberlist) encodePushPullMsg(localState []stateToMerge) ([]byte, error
 	return nil, nil
 }
 
-func (m *Memberlist) readRemoteState(r io.Reader, dec *codec.Decoder) (bool, []stateToMerge, error) {
-	return false, nil, nil
+// don't care about join or not. it will be assigned as an atomic field joining
+func (m *Memberlist) readRemoteState(r io.Reader, dec *codec.Decoder) ([]stateToMerge, error) {
+	return nil, nil
 }
+
+// may notify merge?
+func (m *Memberlist) mergeState(remote []stateToMerge) {}

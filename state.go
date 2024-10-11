@@ -33,6 +33,3 @@ func (m *Memberlist) leaveNode(l *leave) {}
 func (m *Memberlist) refute(lives int) {}
 
 type stateToMerge struct{}
-
-// TODO: find a good name for type of pushNodeState
-func (m *Memberlist) mergeState(remote []stateToMerge) {}

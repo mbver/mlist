@@ -31,8 +31,14 @@ func (m *Memberlist) setIndirectAckHandler(seqNo, ackCh chan indirectAckMsg, nac
 
 }
 
-func (m *Memberlist) handleIndirectPing(buf []byte, from net.Addr) {}
-
 func (m *Memberlist) TcpPing(node *nodeState, timeout time.Duration) chan bool {
 	return nil
 }
+
+func (m *Memberlist) handlePing(msg []byte, from net.Addr) {}
+
+func (m *Memberlist) handleIndirectPing(msg []byte, from net.Addr) {}
+
+func (m *Memberlist) handleAck(msg []byte, from net.Addr, ts time.Time) {}
+
+func (m *Memberlist) handleNack(msg []byte, from net.Addr) {}

@@ -1,6 +1,8 @@
 package memberlist
 
-import "time"
+import (
+	"time"
+)
 
 type Memberlist struct {
 	config      *Config
@@ -8,6 +10,9 @@ type Memberlist struct {
 	transport   *NetTransport
 	mbroadcasts *TransmitCapQueue
 	ubroadcasts UserBroadcasts
+	shutdownCh  chan struct{}
+	longRunMng  *longRunMsgManager
+	numPushPull uint32
 }
 
 type MemberlistBuilder struct{}
