@@ -2,12 +2,14 @@ package memberlist
 
 import (
 	"bytes"
+	"io"
 	"log"
 	"net"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/hashicorp/go-msgpack/v2/codec"
 	"github.com/mbver/mlist/testaddr"
 	"github.com/stretchr/testify/require"
 )
@@ -98,39 +100,36 @@ func TestNetPacking_PackUnpackTCP(t *testing.T) {
 	}
 }
 
-func setupTransportTest(t *testing.T) (t1 *NetTransport, t2 *NetTransport, cleanup1 func(), cleanup2 func()) {
-	addr1, cleanup1 := testaddr.BindAddrs.NextAvailAddr()
-	addrs1 := []string{addr1.String()}
-
-	addr2, cleanup2 := testaddr.BindAddrs.NextAvailAddr()
-	addrs2 := []string{addr2.String()}
+func setupTestTransport(t *testing.T) (*NetTransport, func()) {
+	addr, cleanup := testaddr.BindAddrs.NextAvailAddr()
+	addrs := []string{addr.String()}
 
 	logger := log.New(os.Stderr, "testtransport", log.LstdFlags)
 
 	var err error
 	defer func() {
 		if err != nil {
-			cleanup1()
-			cleanup2()
+			cleanup()
 		}
 	}()
-	t1, err = NewNetTransport(addrs1, 0, logger)
-	require.Nil(t, err)
-	err = t1.Start()
-	require.Nil(t, err)
 
-	t2, err = NewNetTransport(addrs2, 0, logger)
+	var tr *NetTransport
+	tr, err = NewNetTransport(addrs, 0, logger)
 	require.Nil(t, err)
-	err = t2.Start()
+	err = tr.Start()
 	require.Nil(t, err)
-	return t1, t2, cleanup1, cleanup2
+	return tr, cleanup
 }
 
-func TestNetTransport_SendReceive(t *testing.T) {
-	t1, t2, cleanup1, cleanup2 := setupTransportTest(t)
+func TestNetTransport_SendReceiveUDP(t *testing.T) {
+	t1, cleanup1 := setupTestTransport(t)
 	defer func() {
 		t1.Shutdown()
 		cleanup1()
+	}()
+
+	t2, cleanup2 := setupTestTransport(t)
+	defer func() {
 		t2.Shutdown()
 		cleanup2()
 	}()
@@ -145,7 +144,7 @@ func TestNetTransport_SendReceive(t *testing.T) {
 
 	msg := ping{SeqNo: 42, Node: "Node1"}
 	encoded, err := encode(pingMsg, msg)
-	require.Nil(t, err, "expect no error")
+	require.Nil(t, err)
 
 	t1.SendUdp(encoded, udpAddr2.String())
 
@@ -166,4 +165,73 @@ func TestNetTransport_SendReceive(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, decoded.SeqNo, msg.SeqNo)
 	require.Equal(t, decoded.Node, msg.Node)
+}
+
+func TestNetTransport_SendReceiveTCP(t *testing.T) {
+	t1, cleanup1 := setupTestTransport(t)
+	defer func() {
+		t1.Shutdown()
+		cleanup1()
+	}()
+
+	t2, cleanup2 := setupTestTransport(t)
+	defer func() {
+		t2.Shutdown()
+		cleanup2()
+	}()
+
+	addr2, port2, err := t2.GetFirstAddr()
+	require.Nil(t, err)
+	tcpAddr2 := net.TCPAddr{IP: addr2, Port: port2}
+
+	timeout := 5 * time.Millisecond
+	conn1, err := t1.DialTimeout(tcpAddr2.String(), timeout)
+	require.Nil(t, err)
+	defer conn1.Close()
+
+	var conn2 net.Conn
+	select {
+	case conn2 = <-t2.TcpConnCh():
+	case <-time.After(timeout):
+		t.Fatalf("expect no timeout!")
+	}
+	defer conn2.Close()
+
+	conn1.SetDeadline(time.Now().Add(timeout))
+	conn2.SetDeadline(time.Now().Add(timeout))
+
+	msg := ping{SeqNo: 42, Node: "Node1"}
+	encoded, err := encode(pingMsg, msg)
+	require.Nil(t, err)
+
+	conn1.Write(encoded)
+
+	buf := [1]byte{0}
+	_, err = io.ReadFull(conn2, buf[:])
+	require.Nil(t, err)
+	require.Equal(t, msgType(buf[0]), pingMsg, "expect ping msg")
+
+	hd := codec.MsgpackHandle{}
+	dec := codec.NewDecoder(conn2, &hd)
+	var decoded ping
+	err = dec.Decode(&decoded)
+	require.Nil(t, err)
+	require.Equal(t, decoded.SeqNo, msg.SeqNo)
+	require.Equal(t, decoded.Node, msg.Node)
+
+	res := ack{msg.SeqNo, []byte("abc")}
+	encoded, err = encode(ackMsg, res)
+	require.Nil(t, err)
+	conn2.Write(encoded)
+
+	_, err = io.ReadFull(conn1, buf[:])
+	require.Nil(t, err)
+	require.Equal(t, msgType(buf[0]), ackMsg, "expect ack msg")
+
+	var decRes ack
+	dec = codec.NewDecoder(conn1, &hd)
+	err = dec.Decode(&decRes)
+	require.Nil(t, err)
+	require.Equal(t, decRes.SeqNo, res.SeqNo)
+	require.Equal(t, decRes.Payload, res.Payload)
 }

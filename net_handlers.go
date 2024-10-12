@@ -17,7 +17,7 @@ type msgType int
 const (
 	pingMsg msgType = iota
 	indirectPingMsg
-	ackRespMsg
+	ackMsg
 	aliveMsg
 	suspectMsg
 	deadMsg
@@ -76,7 +76,7 @@ func (m *Memberlist) handleUdpMsg(msg []byte, from net.Addr, timestamp time.Time
 		// m.handlePing(buf, from)
 	case indirectPingMsg:
 		// m.handleIndirectPing(buf, from)
-	case ackRespMsg:
+	case ackMsg:
 		// m.handleAck(buf, from, timestamp)
 	case nackRespMsg:
 		// m.handleNack(buf, from)
@@ -241,7 +241,7 @@ func (m *Memberlist) handleTcpConn(conn net.Conn) {
 	}
 }
 
-type ackResp struct {
+type ack struct {
 	SeqNo   uint32
 	Payload []byte
 }
@@ -258,8 +258,8 @@ func (m *Memberlist) handlePingTcp(dec *codec.Decoder, conn net.Conn, streamLabe
 		return
 	}
 
-	ack := ackResp{p.SeqNo, nil}
-	out, err := encode(ackRespMsg, &ack)
+	ack := ack{p.SeqNo, nil}
+	out, err := encode(ackMsg, &ack)
 	if err != nil {
 		// m.logger.Printf("[ERR] memberlist: Failed to encode ack: %s", err)
 		return

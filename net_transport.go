@@ -343,6 +343,11 @@ func (t *NetTransport) SendUdp(msg []byte, addr string) (time.Time, error) {
 	return time.Now(), err
 }
 
+func (t *NetTransport) DialTimeout(addr string, timeout time.Duration) (net.Conn, error) {
+	dialer := net.Dialer{Timeout: timeout}
+	return dialer.Dial("tcp", addr)
+}
+
 func (m *Memberlist) sendUdp(addr string, msg []byte) error {
 	msg, err := m.packUdp(msg)
 	if err != nil {
