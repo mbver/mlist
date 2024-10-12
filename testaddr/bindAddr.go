@@ -1,4 +1,4 @@
-package testutil
+package testaddr
 
 import (
 	"container/list"
