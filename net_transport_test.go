@@ -2,10 +2,13 @@ package memberlist
 
 import (
 	"bytes"
+	"log"
 	"net"
+	"os"
 	"testing"
 	"time"
 
+	"github.com/mbver/mlist/testaddr"
 	"github.com/stretchr/testify/require"
 )
 
@@ -95,6 +98,72 @@ func TestNetPacking_PackUnpackTCP(t *testing.T) {
 	}
 }
 
-func TestNetTransport_SendReceive(t *testing.T) {
+func setupTransportTest(t *testing.T) (t1 *NetTransport, t2 *NetTransport, cleanup1 func(), cleanup2 func()) {
+	addr1, cleanup1 := testaddr.BindAddrs.NextAvailAddr()
+	addrs1 := []string{addr1.String()}
 
+	addr2, cleanup2 := testaddr.BindAddrs.NextAvailAddr()
+	addrs2 := []string{addr2.String()}
+
+	logger := log.New(os.Stderr, "testtransport", log.LstdFlags)
+
+	var err error
+	defer func() {
+		if err != nil {
+			cleanup1()
+			cleanup2()
+		}
+	}()
+	t1, err = NewNetTransport(addrs1, 0, logger)
+	require.Nil(t, err)
+	err = t1.Start()
+	require.Nil(t, err)
+
+	t2, err = NewNetTransport(addrs2, 0, logger)
+	require.Nil(t, err)
+	err = t2.Start()
+	require.Nil(t, err)
+	return t1, t2, cleanup1, cleanup2
+}
+
+func TestNetTransport_SendReceive(t *testing.T) {
+	t1, t2, cleanup1, cleanup2 := setupTransportTest(t)
+	defer func() {
+		t1.Shutdown()
+		cleanup1()
+		t2.Shutdown()
+		cleanup2()
+	}()
+
+	addr1, port1, err := t1.GetFirstAddr()
+	require.Nil(t, err)
+	udpAddr1 := net.UDPAddr{IP: addr1, Port: port1}
+
+	addr2, port2, err := t2.GetFirstAddr()
+	require.Nil(t, err)
+	udpAddr2 := net.UDPAddr{IP: addr2, Port: port2}
+
+	msg := ping{SeqNo: 42, Node: "Node1"}
+	encoded, err := encode(pingMsg, msg)
+	require.Nil(t, err, "expect no error")
+
+	t1.SendUdp(encoded, udpAddr2.String())
+
+	var packet *Packet
+	select {
+	case packet = <-t2.PacketCh():
+	case <-time.After(5 * time.Millisecond):
+		t.Fatalf("expect no timeout")
+	}
+
+	require.Equal(t, packet.From.String(), udpAddr1.String(), "expect matching FROM address")
+
+	received := packet.Buf
+	require.Equal(t, msgType(received[0]), pingMsg, "expect ping msg")
+
+	var decoded ping
+	err = decode(received[1:], &decoded)
+	require.Nil(t, err)
+	require.Equal(t, decoded.SeqNo, msg.SeqNo)
+	require.Equal(t, decoded.Node, msg.Node)
 }
