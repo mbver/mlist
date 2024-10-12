@@ -15,12 +15,17 @@ const testPort = 10101
 
 // maybe add addresses with different masks too?
 func init() {
+	BindAddrs = newAddressList(10, 255)
+}
+
+// create an AddressList from 127.0.0.from to 127.0.0.to excluded
+func newAddressList(from, to byte) *AddressList {
 	ips := list.New()
-	for b := byte(10); b < 255; b++ {
+	for b := from; b < to; b++ {
 		ip := net.IPv4(127, 0, 0, b)
 		ips.PushBack(ip)
 	}
-	BindAddrs = &AddressList{
+	return &AddressList{
 		ips:           ips,
 		gotFreeAddrCh: make(chan struct{}),
 	}
