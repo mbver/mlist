@@ -18,6 +18,7 @@ const (
 	pingMsg msgType = iota
 	indirectPingMsg
 	ackMsg
+	indirectAckMsg
 	aliveMsg
 	suspectMsg
 	deadMsg
@@ -27,7 +28,6 @@ const (
 	userMsg // User mesg, not handled by us
 	compressMsg
 	encryptMsg
-	nackRespMsg
 	hasCrcMsg
 	errMsg
 )
@@ -78,7 +78,7 @@ func (m *Memberlist) handleUdpMsg(msg []byte, from net.Addr, timestamp time.Time
 		// m.handleIndirectPing(buf, from)
 	case ackMsg:
 		// m.handleAck(buf, from, timestamp)
-	case nackRespMsg:
+	case indirectAckMsg:
 		// m.handleNack(buf, from)
 	default:
 		// m.logger.Printf("[ERR] memberlist: msg type (%d) not supported %s", msgType, LogAddress(from))
@@ -239,11 +239,6 @@ func (m *Memberlist) handleTcpConn(conn net.Conn) {
 	default:
 		// m.logger.Printf("[ERR] memberlist: Received invalid msgType (%d) %s", msgType, LogConn(conn))
 	}
-}
-
-type ack struct {
-	SeqNo   uint32
-	Payload []byte
 }
 
 func (m *Memberlist) handlePingTcp(dec *codec.Decoder, conn net.Conn, streamLabel string) {

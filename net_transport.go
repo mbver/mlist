@@ -415,6 +415,14 @@ func (m *Memberlist) sendMsgPiggyback(addr string, msg []byte) error {
 	return m.sendUdp(addr, compound)
 }
 
+func (m *Memberlist) encodeAndSendUdp(addr string, mType msgType, msg interface{}) error {
+	encoded, err := encode(mType, msg)
+	if err != nil {
+		return err
+	}
+	return m.sendMsgPiggyback(addr, encoded)
+}
+
 func (t *NetTransport) GetFirstAddr() (net.IP, int, error) {
 	var ip net.IP
 	// if we are listening on all interfaces, choose a private interface's address
@@ -465,12 +473,12 @@ func (m *Memberlist) finalizeAdvertiseAddr() error {
 	return nil
 }
 
-func (m *Memberlist) GetAdvertiseAddr() (net.IP, int, error) {
+func (m *Memberlist) GetAdvertiseAddr() (net.IP, uint16, error) {
 	ip := net.ParseIP(m.config.AdvertiseAddr)
 	if ip == nil {
 		return nil, 0, fmt.Errorf("failed to parse advertise address %q", m.config.AdvertiseAddr)
 	}
-	return ip, m.config.AdvertisePort, nil
+	return ip, uint16(m.config.AdvertisePort), nil
 }
 
 func (m *Memberlist) isAddrAllowed(a net.Addr) error {

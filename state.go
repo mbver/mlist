@@ -1,6 +1,9 @@
 package memberlist
 
-import "time"
+import (
+	"net"
+	"time"
+)
 
 type StateType int
 
@@ -11,13 +14,33 @@ const (
 	StateLeft
 )
 
-type Node struct{}
+type Node struct {
+	ID   string
+	Addr net.IP
+	Port uint16
+}
 
-type nodeState struct{}
+func (n *Node) Address() string {
+	return joinHostPort(n.Addr.String(), n.Port)
+}
+
+type nodeState struct {
+	Node  *Node
+	Lives uint32
+	State StateType
+}
+
+func (n *nodeState) DeadOrLeft() bool {
+	return n.State == StateDead || n.State == StateLeft
+}
 
 type alive struct{}
 
-type suspect struct{}
+type suspect struct {
+	Lives uint32
+	Node  string
+	From  string
+}
 
 type dead struct{}
 

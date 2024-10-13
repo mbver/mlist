@@ -12,5 +12,7 @@ type Config struct {
 	AdvertisePort        int
 	MaxLongRunQueueDepth int
 	TcpTimeout           time.Duration
+	PingTimeout          time.Duration
 	MaxConcurentPushPull int
+	NumIndirectChecks    int
 }

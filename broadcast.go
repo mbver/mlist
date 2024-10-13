@@ -122,9 +122,6 @@ func (q *TransmitCapQueue) QueueMsg(name string, t msgType, msg []byte, notify c
 		notify: notify,
 	}
 	item.id = q.idSeq
-	if q.idSeq == math.MaxInt64 { // wrap around
-		q.idSeq = 0
-	}
 	q.idSeq++
 
 	q.Push(item)

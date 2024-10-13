@@ -6,6 +6,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"net"
+	"strconv"
 
 	"github.com/hashicorp/go-msgpack/v2/codec"
 	"github.com/sean-/seed"
@@ -94,10 +96,6 @@ func randIdxN(n int) int {
 
 func shuffleNodes(nodes []*nodeState) {}
 
-func joinHostPort(host string, port uint16) string {
-	return ""
-}
-
 // compression
 type compressionType uint8
 
@@ -171,4 +169,8 @@ func hasPort(s string) bool {
 
 func ensurePort(s string, port int) string {
 	return ""
+}
+
+func joinHostPort(host string, port uint16) string {
+	return net.JoinHostPort(host, strconv.Itoa(int(port)))
 }
