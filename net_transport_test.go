@@ -114,11 +114,11 @@ func newTestTransport() (*NetTransport, func(), error) {
 	if err != nil {
 		return tr, cleanup, err
 	}
-	cleanup = func() {
+	cleanup1 := func() {
 		tr.Shutdown()
 		cleanup()
 	}
-	return tr, cleanup, nil
+	return tr, cleanup1, nil
 }
 
 func TestNetTransport_SendReceiveUDP(t *testing.T) {

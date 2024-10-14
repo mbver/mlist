@@ -373,6 +373,7 @@ func (t *NetTransport) Shutdown() {
 	}
 	t.udpConns = nil
 	// Block until all the listener threads have died.
+
 	t.wg.Wait()
 }
 
@@ -441,7 +442,6 @@ func (t *NetTransport) GetFirstAddr() (net.IP, int, error) {
 	} else {
 		ip = t.tcpListeners[0].Addr().(*net.TCPAddr).IP
 	}
-
 	return ip, t.bindPort, nil
 }
 

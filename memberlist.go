@@ -40,10 +40,6 @@ func (m *Memberlist) Leave(timeout time.Duration) error {
 	return nil
 }
 
-func (m *Memberlist) LocalNode() *Node {
-	return nil
-}
-
 func (m *Memberlist) UpdateNode(timeout time.Duration) error {
 	return nil
 }

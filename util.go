@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math/rand"
 	"net"
 	"strconv"
 	"strings"
@@ -92,8 +93,11 @@ func makeCompoundMsgs(msgs [][]byte) []*bytes.Buffer {
 	return nil
 }
 
-func randIdxN(n int) int {
-	return 0
+func randIntN(n int) int {
+	if n == 0 { // if n == 0, modulo will panic
+		return 0
+	}
+	return int(rand.Uint32() % uint32(n))
 }
 
 func shuffleNodes(nodes []*nodeState) {}

@@ -98,3 +98,20 @@ func TestCompoundMsg_MissingMsgLengths(t *testing.T) {
 	require.Error(t, err)
 	require.Equal(t, err.Error(), "truncated len slice")
 }
+
+func TestRandIntN(t *testing.T) {
+	vals := make(map[int]struct{})
+	for i := 0; i < 100; i++ {
+		offset := randIntN(2 << 30)
+		if _, ok := vals[offset]; ok {
+			t.Fatalf("got collision")
+		}
+		vals[offset] = struct{}{}
+	}
+}
+
+func TestRandIntN_Zero(t *testing.T) {
+	if randIntN(0) != 0 {
+		t.Fatalf("expect zero")
+	}
+}

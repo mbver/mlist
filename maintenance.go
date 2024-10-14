@@ -50,7 +50,7 @@ func (m *Memberlist) pickRandomNodes(numNodes int, acceptFn func(*nodeState) boo
 PICKNODE:
 	for i := 0; i < 3*n && len(picked) < numNodes; i++ {
 		// Get random node
-		idx := rand.Intn(n)
+		idx := randIntN(n)
 		node := m.nodes[idx]
 		// check if it is ok to pick
 		if acceptFn != nil && !acceptFn(node) {

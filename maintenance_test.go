@@ -16,6 +16,9 @@ func TestPickRandomNodes(t *testing.T) {
 			state = StateDead
 		}
 		nodes = append(nodes, &nodeState{
+			Node: &Node{
+				ID: UniqueID(),
+			},
 			State: state,
 		})
 	}
@@ -42,7 +45,7 @@ func TestPickRandomNodes(t *testing.T) {
 		}
 		for _, n := range s {
 			if n.State != StateAlive {
-				t.Fatalf("bad state: %v, %s", n, s)
+				t.Fatalf("bad state: %v, %v", n, s)
 			}
 		}
 	}

@@ -73,13 +73,13 @@ func (m *Memberlist) handleUdpMsg(msg []byte, from net.Addr, timestamp time.Time
 	case compoundMsg:
 		// m.handleCompound(buf, from, timestamp)
 	case pingMsg:
-		// m.handlePing(buf, from)
+		m.handlePing(msg, from)
 	case indirectPingMsg:
-		// m.handleIndirectPing(buf, from)
+		m.handleIndirectPing(msg, from)
 	case ackMsg:
-		// m.handleAck(buf, from, timestamp)
+		m.handleAck(msg, from, timestamp)
 	case indirectAckMsg:
-		// m.handleNack(buf, from)
+		m.handleIndirectAck(msg, from)
 	default:
 		// m.logger.Printf("[ERR] memberlist: msg type (%d) not supported %s", msgType, LogAddress(from))
 	}
