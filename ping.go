@@ -37,6 +37,13 @@ type pingManager struct {
 	usrPing             PingDelegate
 }
 
+func newPingManager() *pingManager {
+	return &pingManager{
+		ackHandlers:         make(map[uint32]*ackHandler),
+		indirectAckHandlers: make(map[uint32]*indirectAckHandler),
+	}
+}
+
 func (mng *pingManager) nextSeqNo() uint32 { // will wrap arround
 	return atomic.AddUint32(&mng.seqNo, 1)
 }
@@ -247,7 +254,7 @@ func (m *Memberlist) IndirectPing(node *nodeState, timeout time.Duration) chan i
 		nNacks := int32(0)
 		m.pingMng.setIndirectAckHandler(ind.SeqNo, ackCh, &nNacks, timeout)
 		for _, peer := range peers {
-			if err := m.encodeAndSendUdp(peer.Address(), indirectPingMsg, &ind); err != nil {
+			if err := m.encodeAndSendUdp(peer.Node.Address(), indirectPingMsg, &ind); err != nil {
 				resultCh <- indirectPingResult{false, 0}
 				return
 			}

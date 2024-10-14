@@ -2,6 +2,7 @@ package memberlist
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -9,12 +10,13 @@ type Memberlist struct {
 	config      *Config
 	keyring     *Keyring
 	transport   *NetTransport
+	shutdownCh  chan struct{}
+	shutdown    int32
 	mbroadcasts *TransmitCapQueue
 	ubroadcasts UserBroadcasts
-	shutdownCh  chan struct{}
 	longRunMng  *longRunMsgManager
-	numPushPull uint32
 	pingMng     *pingManager
+	numPushPull uint32
 	nodeLock    sync.RWMutex
 	nodes       []*nodeState
 	nodeMap     map[string]*nodeState
@@ -59,8 +61,13 @@ func (m *Memberlist) hasActivePeers() bool {
 	return false
 }
 
-func (m *Memberlist) Shutdown() error {
-	return nil
+func (m *Memberlist) Shutdown() {
+	if !atomic.CompareAndSwapInt32(&m.shutdown, 0, 1) {
+		return
+	}
+	m.transport.Shutdown()
+	close(m.shutdownCh)
+	// TODO: deschedule
 }
 
 func (m *Memberlist) hasShutdown() bool {
@@ -79,13 +86,9 @@ func (m *Memberlist) GetNodeState(id string) *nodeState {
 	if !ok {
 		return nil
 	}
-	return &nodeState{
-		Node: &Node{
-			ID:   n.Node.ID,
-			Addr: n.Node.Addr,
-			Port: n.Node.Port,
-		},
-		Lives: n.Lives,
-		State: n.State,
-	}
+	return n.Clone()
+}
+
+func (m *Memberlist) LocalNodeState() *nodeState {
+	return m.GetNodeState(m.config.ID)
 }

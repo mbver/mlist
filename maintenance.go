@@ -41,8 +41,31 @@ func (m *Memberlist) scheduleFuncDynamic(interval time.Duration, stopCh chan str
 
 func (m *Memberlist) gossip() {}
 
-func (m *Memberlist) pickRandomNodes(num int, accept func(*nodeState) bool) []Node {
-	return nil
+func (m *Memberlist) pickRandomNodes(numNodes int, acceptFn func(*nodeState) bool) []*nodeState {
+	m.nodeLock.RLock()
+	defer m.nodeLock.RUnlock()
+	n := len(m.nodes)
+	picked := make([]*nodeState, 0, numNodes)
+
+PICKNODE:
+	for i := 0; i < 3*n && len(picked) < numNodes; i++ {
+		// Get random node
+		idx := rand.Intn(n)
+		node := m.nodes[idx]
+		// check if it is ok to pick
+		if acceptFn != nil && !acceptFn(node) {
+			continue
+
+		}
+		// check if it is already picked
+		for j := 0; j < len(picked); j++ {
+			if node.Node.ID == picked[j].Node.ID {
+				continue PICKNODE
+			}
+		}
+		picked = append(picked, node.Clone())
+	}
+	return picked
 }
 
 func (m *Memberlist) probe() {}

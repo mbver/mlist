@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func setUpPackTest() (*Memberlist, error) {
+func newPackTestMemberlist() (*Memberlist, error) {
 	key := []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
 	keyRing, err := NewKeyring(nil, key)
 	if err != nil {
@@ -31,7 +31,7 @@ func setUpPackTest() (*Memberlist, error) {
 }
 
 func TestNetPacking_PackUnpackUDP(t *testing.T) {
-	m, err := setUpPackTest()
+	m, err := newPackTestMemberlist()
 	require.Nil(t, err, "setup memberlist failed")
 	msg := []byte("this is a message")
 	label := "label"
@@ -72,7 +72,7 @@ func (c *MockConn) SetReadDeadline(t time.Time) error  { return nil }
 func (c *MockConn) SetWriteDeadline(t time.Time) error { return nil }
 
 func TestNetPacking_PackUnpackTCP(t *testing.T) {
-	m, err := setUpPackTest()
+	m, err := newPackTestMemberlist()
 	require.Nil(t, err, "setup memberlist failed")
 
 	msg := []byte("this is a message")
@@ -100,39 +100,43 @@ func TestNetPacking_PackUnpackTCP(t *testing.T) {
 	}
 }
 
-func setupTestTransport(t *testing.T) (*NetTransport, func()) {
+func newTestTransport() (*NetTransport, func(), error) {
 	addr, cleanup := testaddr.BindAddrs.NextAvailAddr()
 	addrs := []string{addr.String()}
 
 	logger := log.New(os.Stderr, "testtransport", log.LstdFlags)
-
-	var err error
-	defer func() {
-		if err != nil {
-			cleanup()
-		}
-	}()
-
 	var tr *NetTransport
-	tr, err = NewNetTransport(addrs, 0, logger)
-	require.Nil(t, err)
+	tr, err := NewNetTransport(addrs, 0, logger)
+	if err != nil {
+		return tr, cleanup, err
+	}
 	err = tr.Start()
-	require.Nil(t, err)
-	return tr, cleanup
+	if err != nil {
+		return tr, cleanup, err
+	}
+	cleanup = func() {
+		tr.Shutdown()
+		cleanup()
+	}
+	return tr, cleanup, nil
 }
 
 func TestNetTransport_SendReceiveUDP(t *testing.T) {
-	t1, cleanup1 := setupTestTransport(t)
+	t1, cleanup1, err := newTestTransport()
 	defer func() {
-		t1.Shutdown()
-		cleanup1()
+		if cleanup1 != nil {
+			cleanup1()
+		}
 	}()
+	require.Nil(t, err)
 
-	t2, cleanup2 := setupTestTransport(t)
+	t2, cleanup2, err := newTestTransport()
 	defer func() {
-		t2.Shutdown()
-		cleanup2()
+		if cleanup2 != nil {
+			cleanup2()
+		}
 	}()
+	require.Nil(t, err)
 
 	addr1, port1, err := t1.GetFirstAddr()
 	require.Nil(t, err)
@@ -168,17 +172,21 @@ func TestNetTransport_SendReceiveUDP(t *testing.T) {
 }
 
 func TestNetTransport_SendReceiveTCP(t *testing.T) {
-	t1, cleanup1 := setupTestTransport(t)
+	t1, cleanup1, err := newTestTransport()
 	defer func() {
-		t1.Shutdown()
-		cleanup1()
+		if cleanup1 != nil {
+			cleanup1()
+		}
 	}()
+	require.Nil(t, err)
 
-	t2, cleanup2 := setupTestTransport(t)
+	t2, cleanup2, err := newTestTransport()
 	defer func() {
-		t2.Shutdown()
-		cleanup2()
+		if cleanup2 != nil {
+			cleanup2()
+		}
 	}()
+	require.Nil(t, err)
 
 	addr2, port2, err := t2.GetFirstAddr()
 	require.Nil(t, err)

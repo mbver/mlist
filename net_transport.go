@@ -359,11 +359,9 @@ func (m *Memberlist) sendUdp(addr string, msg []byte) error {
 }
 
 func (t *NetTransport) Shutdown() {
-	if atomic.LoadInt32(&t.shutdown) == 1 {
+	if !atomic.CompareAndSwapInt32(&t.shutdown, 0, 1) {
 		return
 	}
-
-	atomic.StoreInt32(&t.shutdown, 1)
 
 	// Rip through all the connections and shut them down.
 	for _, ln := range t.tcpListeners {

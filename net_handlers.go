@@ -107,9 +107,18 @@ func (m *Memberlist) handleCompound(msg []byte, from net.Addr, timestamp time.Ti
 type longRunMsgManager struct {
 	highPriorQueue *list.List
 	lowPriorQueue  *list.List
-	maxQueuDepth   int // taken from memberlist config
+	maxQueueDepth  int // taken from memberlist config
 	l              sync.Mutex
 	gotMsgCh       chan struct{}
+}
+
+func newLongRunMsgManager(qDepth int) *longRunMsgManager {
+	return &longRunMsgManager{
+		highPriorQueue: list.New(),
+		lowPriorQueue:  list.New(),
+		maxQueueDepth:  qDepth,
+		gotMsgCh:       make(chan struct{}),
+	}
 }
 
 type longRunMsg struct {
@@ -131,7 +140,7 @@ func (mng *longRunMsgManager) queueLongRunMsg(t msgType, msg []byte, from net.Ad
 
 	// Check for overflow and append if not full
 	mng.l.Lock()
-	if queue.Len() >= mng.maxQueuDepth { // drop msg
+	if queue.Len() >= mng.maxQueueDepth { // drop msg
 		// m.logger.Printf("[WARN] memberlist: handler queue full, dropping message (%d) %s", msgType, LogAddress(from))
 	} else {
 		queue.PushBack(&longRunMsg{t, msg, from})

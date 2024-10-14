@@ -8,7 +8,9 @@ import (
 	"io"
 	"net"
 	"strconv"
+	"strings"
 
+	"github.com/google/uuid"
 	"github.com/hashicorp/go-msgpack/v2/codec"
 	"github.com/sean-/seed"
 )
@@ -173,4 +175,10 @@ func ensurePort(s string, port int) string {
 
 func joinHostPort(host string, port uint16) string {
 	return net.JoinHostPort(host, strconv.Itoa(int(port)))
+}
+
+func UniqueID() string {
+	id := uuid.New()
+	str := id.String()
+	return strings.ReplaceAll(str, "-", "")
 }

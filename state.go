@@ -34,6 +34,18 @@ func (n *nodeState) DeadOrLeft() bool {
 	return n.State == StateDead || n.State == StateLeft
 }
 
+func (n *nodeState) Clone() *nodeState {
+	return &nodeState{
+		Node: &Node{
+			ID:   n.Node.ID,
+			Addr: n.Node.Addr,
+			Port: n.Node.Port,
+		},
+		Lives: n.Lives,
+		State: n.State,
+	}
+}
+
 type alive struct{}
 
 type suspect struct {
