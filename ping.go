@@ -249,6 +249,7 @@ func (m *Memberlist) IndirectPing(node *nodeState, timeout time.Duration) chan i
 		for _, peer := range peers {
 			if err := m.encodeAndSendUdp(peer.Address(), indirectPingMsg, &ind); err != nil {
 				resultCh <- indirectPingResult{false, 0}
+				return
 			}
 		}
 
@@ -307,7 +308,7 @@ func (m *Memberlist) handleIndirectPing(msg []byte, from net.Addr) {
 func (m *Memberlist) handleIndirectAck(msg []byte, from net.Addr) {
 	var in indirectAck
 	if err := decode(msg, &in); err != nil {
-		// log error
+		// log error with from
 		return
 	}
 	m.pingMng.invokeIndirectAckHandler(in)
@@ -333,5 +334,60 @@ func (mng *pingManager) invokeIndirectAckHandler(in indirectAck) {
 }
 
 func (m *Memberlist) TcpPing(node *nodeState, timeout time.Duration) chan bool {
-	return nil
+	result := make(chan bool, 1)
+	go func() {
+		start := time.Now()
+		deadline := start.Add(timeout)
+		localAddr, localPort, err := m.GetAdvertiseAddr()
+		if err != nil {
+			// log error
+			result <- false
+			return
+		}
+		ping := ping{
+			SeqNo:      m.pingMng.nextSeqNo(),
+			Node:       node.Node.ID,
+			SourceAddr: localAddr,
+			SourcePort: localPort,
+		}
+		conn, err := m.transport.DialTimeout(node.Node.Address(), timeout)
+		if err != nil {
+			result <- false
+			return
+		}
+		defer conn.Close()
+
+		conn.SetDeadline(deadline)
+
+		encoded, err := encode(pingMsg, &ping)
+		if err != nil {
+			result <- false
+			return
+		}
+		if err = m.sendTcp(conn, encoded, m.config.Label); err != nil {
+			result <- false
+			return
+		}
+		msgType, _, dec, err := m.unpackStream(conn, m.config.Label)
+		if err != nil {
+			result <- false
+			return
+		}
+		if msgType != ackMsg { // log error
+			// m.logger.Printf("unexpected msgType (%d) from ping %s", msgType, LogConn(conn))
+			result <- false
+			return
+		}
+		var a ack
+		if err = dec.Decode(&a); err != nil {
+			result <- false
+			return
+		}
+		if a.SeqNo != ping.SeqNo {
+			result <- false
+			return
+		}
+		result <- true
+	}()
+	return result
 }
