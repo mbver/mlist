@@ -46,10 +46,10 @@ func newTestPingMemberlist() (*Memberlist, func(), error) {
 	m.nodeMap = map[string]*nodeState{
 		id: node,
 	}
-	go func() {
-		m.receivePacket()
-		m.receiveTcpConn()
-	}()
+
+	go m.receivePacket()
+	go m.receiveTcpConn()
+
 	cleanup1 := func() {
 		m.Shutdown()
 		cleanup()
@@ -101,12 +101,13 @@ func TestPing_DirectIndirectTcp(t *testing.T) {
 		t.Fatalf("expect no timeout in indirect ping")
 	}
 
-	// tcpCh := m1.TcpPing(node2, m1.config.PingTimeout)
-	// select {
-	// case res := <-tcpCh:
-	// 	if !res {
-	// 		t.Fatalf("tcp ping failed")
-	// 	}
-	// case <-time.After(m1.config.PingTimeout):
-	// }
+	tcpCh := m1.TcpPing(node2, m1.config.PingTimeout)
+	select {
+	case res := <-tcpCh:
+		if !res {
+			t.Fatalf("tcp ping failed")
+		}
+	case <-time.After(m1.config.PingTimeout):
+		t.Fatalf("expect no timeout")
+	}
 }
