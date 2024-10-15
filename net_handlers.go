@@ -75,7 +75,7 @@ func (m *Memberlist) handleUdpMsg(msg []byte, from *net.UDPAddr, timestamp time.
 	case pingMsg:
 		m.handlePing(msg, from)
 	case indirectPingMsg:
-		go m.handleIndirectPing(msg, from)
+		m.handleIndirectPing(msg, from)
 	case ackMsg:
 		m.handleAck(msg, from, timestamp)
 	case indirectAckMsg:

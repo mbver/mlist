@@ -286,15 +286,17 @@ func (m *Memberlist) handleIndirectPing(msg []byte, from *net.UDPAddr) {
 		},
 		State: StateAlive,
 	}
+	go func() {
+		ok := m.Ping(node)
+		indAck := indirectAck{ind.SeqNo, true}
+		if !ok {
+			indAck.Success = false
+		}
+		if err := m.encodeAndSendUdp(addr, indirectAckMsg, indAck); err != nil {
+			// log error
+		}
+	}()
 
-	ok := m.Ping(node)
-	indAck := indirectAck{ind.SeqNo, true}
-	if !ok {
-		indAck.Success = false
-	}
-	if err := m.encodeAndSendUdp(addr, indirectAckMsg, indAck); err != nil {
-		// log error
-	}
 }
 
 func (m *Memberlist) handleIndirectAck(msg []byte, from *net.UDPAddr) {
