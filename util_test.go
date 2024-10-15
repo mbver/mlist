@@ -2,6 +2,7 @@ package memberlist
 
 import (
 	"bytes"
+	"net"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -23,18 +24,31 @@ func TestEncodeDecode(t *testing.T) {
 }
 
 func TestCompressDecompress(t *testing.T) {
-	buf, err := compress([]byte("testing"))
-	if err != nil {
-		t.Fatalf("unexpected err: %s", err)
+	ip := net.IPv4(127, 0, 0, 11)
+	port := uint16(57732)
+	msg := indirectPing{
+		SeqNo:      42,
+		IP:         ip,
+		Port:       port,
+		Node:       "node1",
+		SourceIP:   ip,
+		SourcePort: port,
 	}
-
+	encoded, err := encode(indirectPingMsg, msg)
+	require.Nil(t, err)
+	buf, err := compress([]byte(encoded))
+	require.Nil(t, err)
 	decomp, err := decompressMsg(buf[1:])
-	if err != nil {
-		t.Fatalf("unexpected err: %s", err)
-	}
-
-	if !bytes.Equal(decomp, []byte("testing")) {
-		t.Fatalf("bad payload: %v", decomp)
+	require.Nil(t, err)
+	require.Equal(t, msgType(decomp[0]), indirectPingMsg)
+	var decoded indirectPing
+	decode(decomp[1:], &decoded)
+	require.Equal(t, decoded.SeqNo, msg.SeqNo)
+	require.Equal(t, decoded.Node, msg.Node)
+	require.Equal(t, decoded.Port, msg.Port)
+	require.Equal(t, decoded.SourcePort, msg.SourcePort)
+	if !bytes.Equal(decoded.IP, msg.IP) || !bytes.Equal(decoded.SourceIP, msg.SourceIP) {
+		t.Errorf("unmatched address")
 	}
 }
 

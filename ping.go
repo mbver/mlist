@@ -10,7 +10,7 @@ import (
 type ping struct {
 	SeqNo      uint32
 	Node       string
-	SourceAddr []byte `codec:",omitempty"`
+	SourceIP   []byte `codec:",omitempty"`
 	SourcePort uint16 `codec:",omitempty"`
 }
 
@@ -92,7 +92,7 @@ type PingDelegate interface {
 // run the handler for seqNo when its ack arrives. delete handler from the map.
 // include buddy mechanism. they are almost the same
 func (m *Memberlist) Ping(node *nodeState) bool {
-	localAddr, localPort, err := m.GetAdvertiseAddr()
+	localIp, localPort, err := m.GetAdvertiseAddr()
 	if err != nil {
 		// TODO; log error
 		return false
@@ -101,7 +101,7 @@ func (m *Memberlist) Ping(node *nodeState) bool {
 	p := ping{
 		SeqNo:      m.pingMng.nextSeqNo(),
 		Node:       node.Node.ID,
-		SourceAddr: localAddr,
+		SourceIP:   localIp,
 		SourcePort: localPort,
 	}
 
@@ -110,7 +110,7 @@ func (m *Memberlist) Ping(node *nodeState) bool {
 	sent := time.Now()
 
 	if node.State == StateAlive {
-		if err := m.encodeAndSendUdp(node.Node.Address(), pingMsg, &p); err != nil {
+		if err := m.encodeAndSendUdp(node.Node.UDPAddress(), pingMsg, &p); err != nil {
 			// TODO: log error
 			return false
 		}
@@ -121,7 +121,7 @@ func (m *Memberlist) Ping(node *nodeState) bool {
 			// log err
 			return false
 		}
-		if err = m.sendUdp(node.Node.Address(), msg); err != nil {
+		if err = m.sendUdp(node.Node.UDPAddress(), msg); err != nil {
 			// log err
 			return false
 		}
@@ -155,7 +155,7 @@ func buddyPingMsg(p ping, s suspect) ([]byte, error) {
 	return packCompoundMsg(msgs), nil
 }
 
-func (m *Memberlist) handlePing(buf []byte, from net.Addr) {
+func (m *Memberlist) handlePing(buf []byte, from *net.UDPAddr) {
 	var p ping
 	if err := decode(buf, &p); err != nil {
 		// m.logger.Printf("[ERR] memberlist: Failed to decode ping request: %s %s", err, LogAddress(from))
@@ -172,12 +172,9 @@ func (m *Memberlist) handlePing(buf []byte, from net.Addr) {
 	if m.pingMng.usrPing != nil {
 		a.Payload = m.pingMng.usrPing.Payload()
 	}
-
-	var addr string
-	if len(p.SourceAddr) > 0 && p.SourcePort > 0 {
-		addr = joinHostPort(net.IP(p.SourceAddr).String(), p.SourcePort)
-	} else {
-		addr = from.String()
+	addr := from
+	if len(p.SourceIP) > 0 && p.SourcePort > 0 {
+		addr = &net.UDPAddr{IP: p.SourceIP, Port: int(p.SourcePort)}
 	}
 
 	if err := m.encodeAndSendUdp(addr, ackMsg, &a); err != nil {
@@ -187,12 +184,11 @@ func (m *Memberlist) handlePing(buf []byte, from net.Addr) {
 
 type indirectPing struct {
 	SeqNo      uint32
-	Addr       string
+	IP         []byte
 	Port       uint16
 	Node       string
-	SourceAddr string `codec:",omitempty"`
+	SourceIP   []byte `codec:",omitempty"`
 	SourcePort uint16 `codec:",omitempty"`
-	SourceNode string `codec:",omitempty"`
 }
 
 type indirectAck struct {
@@ -226,7 +222,7 @@ type indirectPingResult struct {
 func (m *Memberlist) IndirectPing(node *nodeState, timeout time.Duration) chan indirectPingResult {
 	resultCh := make(chan indirectPingResult, 1)
 	go func() {
-		localAddr, localPort, err := m.GetAdvertiseAddr()
+		localIp, localPort, err := m.GetAdvertiseAddr()
 		if err != nil {
 			// log error
 			resultCh <- indirectPingResult{false, 0}
@@ -242,19 +238,18 @@ func (m *Memberlist) IndirectPing(node *nodeState, timeout time.Duration) chan i
 
 		ind := indirectPing{
 			SeqNo:      m.pingMng.nextSeqNo(),
-			Addr:       node.Node.Address(),
+			IP:         node.Node.IP,
 			Port:       node.Node.Port,
 			Node:       node.Node.ID,
-			SourceAddr: localAddr.String(),
+			SourceIP:   localIp,
 			SourcePort: localPort,
-			SourceNode: m.config.ID,
 		}
 
 		ackCh := make(chan struct{})
 		nNacks := int32(0)
 		m.pingMng.setIndirectAckHandler(ind.SeqNo, ackCh, &nNacks, timeout)
 		for _, peer := range peers {
-			if err := m.encodeAndSendUdp(peer.Node.Address(), indirectPingMsg, &ind); err != nil {
+			if err := m.encodeAndSendUdp(peer.Node.UDPAddress(), indirectPingMsg, &ind); err != nil {
 				resultCh <- indirectPingResult{false, 0}
 				return
 			}
@@ -271,7 +266,7 @@ func (m *Memberlist) IndirectPing(node *nodeState, timeout time.Duration) chan i
 	return resultCh
 }
 
-func (m *Memberlist) handleIndirectPing(msg []byte, from net.Addr) {
+func (m *Memberlist) handleIndirectPing(msg []byte, from *net.UDPAddr) {
 	var ind indirectPing
 	if err := decode(msg, &ind); err != nil {
 		// m.logger.Printf("[ERR] memberlist: Failed to decode indirect ping request: %s %s", err, LogAddress(from))
@@ -279,40 +274,30 @@ func (m *Memberlist) handleIndirectPing(msg []byte, from net.Addr) {
 	}
 
 	// get address of requestor
-	var addr string
-	if len(ind.SourceAddr) > 0 && ind.SourcePort > 0 {
-		addr = joinHostPort(net.IP(ind.SourceAddr).String(), ind.SourcePort)
-	} else {
-		addr = from.String()
+	addr := from
+	if len(ind.SourceIP) > 0 && ind.SourcePort > 0 {
+		addr = &net.UDPAddr{IP: ind.SourceIP, Port: int(ind.SourcePort)}
+	}
+	node := &nodeState{
+		Node: &Node{
+			ID:   ind.Node,
+			IP:   ind.IP,
+			Port: ind.Port,
+		},
+		State: StateAlive,
 	}
 
-	var ok bool
-	defer func() {
-		indAck := indirectAck{ind.SeqNo, true}
-		if !ok {
-			indAck.Success = false
-		}
-		if err := m.encodeAndSendUdp(addr, indirectAckMsg, indAck); err != nil {
-			// log error
-		}
-	}()
-	node := m.GetNodeState(ind.Node)
-	if node == nil {
-		ok = false
-		return
+	ok := m.Ping(node)
+	indAck := indirectAck{ind.SeqNo, true}
+	if !ok {
+		indAck.Success = false
 	}
-	if node.Node.Address() != ind.Addr {
-		ok = false
-		return
+	if err := m.encodeAndSendUdp(addr, indirectAckMsg, indAck); err != nil {
+		// log error
 	}
-	if node.DeadOrLeft() {
-		ok = false
-		return
-	}
-	ok = m.Ping(node)
 }
 
-func (m *Memberlist) handleIndirectAck(msg []byte, from net.Addr) {
+func (m *Memberlist) handleIndirectAck(msg []byte, from *net.UDPAddr) {
 	var in indirectAck
 	if err := decode(msg, &in); err != nil {
 		// log error with from
@@ -345,7 +330,7 @@ func (m *Memberlist) TcpPing(node *nodeState, timeout time.Duration) chan bool {
 	go func() {
 		start := time.Now()
 		deadline := start.Add(timeout)
-		localAddr, localPort, err := m.GetAdvertiseAddr()
+		localIp, localPort, err := m.GetAdvertiseAddr()
 		if err != nil {
 			// log error
 			result <- false
@@ -354,10 +339,11 @@ func (m *Memberlist) TcpPing(node *nodeState, timeout time.Duration) chan bool {
 		ping := ping{
 			SeqNo:      m.pingMng.nextSeqNo(),
 			Node:       node.Node.ID,
-			SourceAddr: localAddr,
+			SourceIP:   localIp,
 			SourcePort: localPort,
 		}
-		conn, err := m.transport.DialTimeout(node.Node.Address(), timeout)
+		addr := node.Node.TCPAddress().String()
+		conn, err := m.transport.DialTimeout(addr, timeout)
 		if err != nil {
 			result <- false
 			return

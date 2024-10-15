@@ -28,7 +28,7 @@ func newTestPingMemberlist() (*Memberlist, func(), error) {
 
 	m.shutdownCh = make(chan struct{})
 
-	addr, port, err := m.GetAdvertiseAddr()
+	ip, port, err := m.GetAdvertiseAddr()
 	if err != nil {
 		return m, cleanup, err
 	}
@@ -36,7 +36,7 @@ func newTestPingMemberlist() (*Memberlist, func(), error) {
 	node := &nodeState{
 		Node: &Node{
 			ID:   id,
-			Addr: addr,
+			IP:   ip,
 			Port: port,
 		},
 		Lives: 1,

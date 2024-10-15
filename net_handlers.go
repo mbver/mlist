@@ -44,7 +44,7 @@ func (m *Memberlist) receivePacket() {
 	}
 }
 
-func (m *Memberlist) handlePacket(msg []byte, from net.Addr, timestamp time.Time) {
+func (m *Memberlist) handlePacket(msg []byte, from *net.UDPAddr, timestamp time.Time) {
 	packetLabel := m.config.Label
 	var err error
 	msg, err = m.unpackPacket(msg, packetLabel)
@@ -55,7 +55,7 @@ func (m *Memberlist) handlePacket(msg []byte, from net.Addr, timestamp time.Time
 	m.handleUdpMsg(msg, from, timestamp) // another goroutine?
 }
 
-func (m *Memberlist) handleUdpMsg(msg []byte, from net.Addr, timestamp time.Time) {
+func (m *Memberlist) handleUdpMsg(msg []byte, from *net.UDPAddr, timestamp time.Time) {
 	if len(msg) < 1 {
 		// m.logger.Printf("[ERR] memberlist: missing message type byte %s", LogAddress(from))
 		return
@@ -75,7 +75,7 @@ func (m *Memberlist) handleUdpMsg(msg []byte, from net.Addr, timestamp time.Time
 	case pingMsg:
 		m.handlePing(msg, from)
 	case indirectPingMsg:
-		m.handleIndirectPing(msg, from)
+		go m.handleIndirectPing(msg, from)
 	case ackMsg:
 		m.handleAck(msg, from, timestamp)
 	case indirectAckMsg:
@@ -85,7 +85,7 @@ func (m *Memberlist) handleUdpMsg(msg []byte, from net.Addr, timestamp time.Time
 	}
 }
 
-func (m *Memberlist) handleCompound(msg []byte, from net.Addr, timestamp time.Time) {
+func (m *Memberlist) handleCompound(msg []byte, from *net.UDPAddr, timestamp time.Time) {
 	// Decode the parts
 	trunc, msgs, err := unpackCompoundMsg(msg)
 	if err != nil {

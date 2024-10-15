@@ -16,12 +16,22 @@ const (
 
 type Node struct {
 	ID   string
-	Addr net.IP
+	IP   net.IP
 	Port uint16
 }
 
-func (n *Node) Address() string {
-	return joinHostPort(n.Addr.String(), n.Port)
+func (n *Node) UDPAddress() *net.UDPAddr {
+	return &net.UDPAddr{
+		IP:   n.IP,
+		Port: int(n.Port),
+	}
+}
+
+func (n *Node) TCPAddress() *net.TCPAddr {
+	return &net.TCPAddr{
+		IP:   n.IP,
+		Port: int(n.Port),
+	}
 }
 
 type nodeState struct {
@@ -38,7 +48,7 @@ func (n *nodeState) Clone() *nodeState {
 	return &nodeState{
 		Node: &Node{
 			ID:   n.Node.ID,
-			Addr: n.Node.Addr,
+			IP:   n.Node.IP,
 			Port: n.Node.Port,
 		},
 		Lives: n.Lives,

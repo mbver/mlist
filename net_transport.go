@@ -10,7 +10,6 @@ import (
 	"log"
 	"net"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/hashicorp/go-msgpack/v2/codec"
@@ -74,7 +73,7 @@ func (m *Memberlist) unpackPacket(msg []byte, packetLabel string) ([]byte, error
 
 	if msgType(msg[0]) == compressMsg {
 		var err error
-		msg, err = decompressMsg(msg)
+		msg, err = decompressMsg(msg[1:])
 		if err != nil {
 			return nil, err
 		}
@@ -172,7 +171,7 @@ const (
 
 type Packet struct {
 	Buf       []byte
-	From      net.Addr
+	From      *net.UDPAddr
 	Timestamp time.Time
 }
 
@@ -185,7 +184,8 @@ type NetTransport struct {
 	tcpConnCh    chan net.Conn
 	tcpListeners []*net.TCPListener
 	wg           sync.WaitGroup // to synchronize closing listeners when shutdown
-	shutdown     int32
+	l            sync.Mutex
+	shutdown     bool
 }
 
 func NewNetTransport(addrs []string, port int, logger *log.Logger) (*NetTransport, error) {
@@ -209,6 +209,9 @@ func (t *NetTransport) Start() error {
 			t.Shutdown()
 		}
 	}()
+
+	t.l.Lock()
+	defer t.l.Unlock()
 
 	// create tcp and udp listeners on its addresses and port
 	for _, addr := range t.bindAddrs {
@@ -247,6 +250,30 @@ func (t *NetTransport) Start() error {
 	return nil
 }
 
+func (t *NetTransport) Shutdown() {
+	t.l.Lock()
+	t.shutdown = true
+	// Rip through all the connections and shut them down.
+	for _, ln := range t.tcpListeners {
+		ln.Close()
+	}
+	t.tcpListeners = nil
+	for _, conn := range t.udpConns {
+		conn.Close()
+	}
+	t.udpConns = nil
+	// Block until all the listener threads have died.
+	t.l.Unlock()
+
+	t.wg.Wait()
+}
+
+func (t *NetTransport) hasShutdown() bool {
+	t.l.Lock()
+	defer t.l.Unlock()
+	return t.shutdown
+}
+
 // try to set udp socket buffer size to its largest value
 func setUDPSocketBuf(c *net.UDPConn) error {
 	size := udpSocketBufSize
@@ -271,7 +298,7 @@ func (t *NetTransport) tcpListen(l *net.TCPListener) {
 	for {
 		conn, err := l.AcceptTCP()
 		if err != nil {
-			if s := atomic.LoadInt32(&t.shutdown); s == 1 {
+			if t.hasShutdown() {
 				break
 			}
 			// exponential backoff
@@ -306,13 +333,14 @@ func (t *NetTransport) udpListen(c *net.UDPConn) {
 		n, addr, err := c.ReadFrom(buf)
 		ts := time.Now() // timestamp just after IO
 		if err != nil {
-			if s := atomic.LoadInt32(&t.shutdown); s == 1 {
+			if t.hasShutdown() {
 				break
 			}
 
 			t.logger.Printf("[ERR] memberlist: Error reading UDP packet: %v", err)
 			continue
 		}
+		udpAddr := addr.(*net.UDPAddr)
 
 		// msg must have at least 1 byte
 		if n < 1 {
@@ -323,7 +351,7 @@ func (t *NetTransport) udpListen(c *net.UDPConn) {
 		// Ingest the packet.
 		t.packetCh <- &Packet{
 			Buf:       buf[:n],
-			From:      addr,
+			From:      udpAddr,
 			Timestamp: ts,
 		}
 	}
@@ -333,48 +361,27 @@ func (t *NetTransport) PacketCh() <-chan *Packet {
 	return t.packetCh
 }
 
-func (t *NetTransport) SendUdp(msg []byte, addr string) (time.Time, error) {
-	udpAddr, err := net.ResolveUDPAddr("udp", addr)
-	if err != nil {
-		return time.Time{}, err
+func (t *NetTransport) SendUdp(msg []byte, addr *net.UDPAddr) (time.Time, error) {
+	if t.hasShutdown() {
+		return time.Time{}, fmt.Errorf("transport shutdown")
 	}
 	// use the first udp conn
-	_, err = t.udpConns[0].WriteTo(msg, udpAddr)
+	_, err := t.udpConns[0].WriteTo(msg, addr)
 	return time.Now(), err
+}
+
+func (m *Memberlist) sendUdp(addr *net.UDPAddr, msg []byte) error {
+	msg, err := m.packUdp(msg)
+	if err != nil {
+		return err
+	}
+	_, err = m.transport.SendUdp(msg, addr)
+	return err
 }
 
 func (t *NetTransport) DialTimeout(addr string, timeout time.Duration) (net.Conn, error) {
 	dialer := net.Dialer{Timeout: timeout}
 	return dialer.Dial("tcp", addr)
-}
-
-func (m *Memberlist) sendUdp(addr string, msg []byte) error {
-	msg, err := m.packUdp(msg)
-	if err != nil {
-		return err
-	}
-
-	_, err = m.transport.SendUdp(msg, addr)
-	return err
-}
-
-func (t *NetTransport) Shutdown() {
-	if !atomic.CompareAndSwapInt32(&t.shutdown, 0, 1) {
-		return
-	}
-
-	// Rip through all the connections and shut them down.
-	for _, ln := range t.tcpListeners {
-		ln.Close()
-	}
-	t.tcpListeners = nil
-	for _, conn := range t.udpConns {
-		conn.Close()
-	}
-	t.udpConns = nil
-	// Block until all the listener threads have died.
-
-	t.wg.Wait()
 }
 
 func (m *Memberlist) sendTcp(conn net.Conn, msg []byte, streamLabel string) error {
@@ -393,7 +400,7 @@ func (m *Memberlist) sendTcp(conn net.Conn, msg []byte, streamLabel string) erro
 }
 
 // get some msgs in broadcast queue and send it together with msg
-func (m *Memberlist) sendMsgPiggyback(addr string, msg []byte) error {
+func (m *Memberlist) sendMsgPiggyback(addr *net.UDPAddr, msg []byte) error {
 	bytesRemaining := m.config.UDPBufferSize - len(msg) - compoundHeaderOverhead
 	if m.EncryptionEnabled() {
 		bytesRemaining -= encryptOverhead(m.config.EncryptionVersion)
@@ -414,7 +421,7 @@ func (m *Memberlist) sendMsgPiggyback(addr string, msg []byte) error {
 	return m.sendUdp(addr, compound)
 }
 
-func (m *Memberlist) encodeAndSendUdp(addr string, mType msgType, msg interface{}) error {
+func (m *Memberlist) encodeAndSendUdp(addr *net.UDPAddr, mType msgType, msg interface{}) error {
 	encoded, err := encode(mType, msg)
 	if err != nil {
 		return err
@@ -423,6 +430,9 @@ func (m *Memberlist) encodeAndSendUdp(addr string, mType msgType, msg interface{
 }
 
 func (t *NetTransport) GetFirstAddr() (net.IP, int, error) {
+	if t.hasShutdown() {
+		return nil, 0, fmt.Errorf("transport shutdown")
+	}
 	var ip net.IP
 	// if we are listening on all interfaces, choose a private interface's address
 	if t.bindAddrs[0] == "0.0.0.0" {
