@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"hash/crc32"
 	"io"
@@ -53,6 +54,7 @@ func NewNetTransport(addrs []string, port int, logger *log.Logger) (*NetTranspor
 	return &NetTransport{
 		bindAddrs: addrs,
 		bindPort:  port,
+		logger:    logger,
 		packetCh:  make(chan *Packet),
 		tcpConnCh: make(chan net.Conn),
 	}, nil
@@ -193,8 +195,10 @@ func (t *NetTransport) udpListen(c *net.UDPConn) {
 			if t.hasShutdown() {
 				break
 			}
-
 			t.logger.Printf("[ERR] memberlist: Error reading UDP packet: %v", err)
+			if errors.Is(err, net.ErrClosed) {
+				break
+			}
 			continue
 		}
 		udpAddr := addr.(*net.UDPAddr)

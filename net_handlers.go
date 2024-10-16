@@ -170,7 +170,6 @@ func (m *Memberlist) handleIndirectPing(msg []byte, from *net.UDPAddr) {
 			// log error
 		}
 	}()
-
 }
 
 func (m *Memberlist) handleIndirectAck(msg []byte, from *net.UDPAddr) {

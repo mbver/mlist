@@ -110,4 +110,17 @@ func TestPing_DirectIndirectTcp(t *testing.T) {
 	case <-time.After(m1.config.PingTimeout):
 		t.Fatalf("expect no timeout")
 	}
+
+	conn, _ := m2.transport.GetFirstConn()
+	conn.Close()
+
+	timeout := m1.config.ProbeInterval - m1.config.PingTimeout // 2 * PingTimeout
+	resCh = m1.IndirectPing(node2, timeout)
+	select {
+	case res := <-resCh:
+		require.False(t, res.success, "expect fail indirect ping")
+		require.Equal(t, res.nNacks, 1, "expect nack")
+	case <-time.After(timeout + 10*time.Millisecond): // allow some extra time
+		t.Fatalf("expect no timeout in indirect ping")
+	}
 }

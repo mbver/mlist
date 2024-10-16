@@ -27,7 +27,7 @@ func DefaultLANConfig(id string) *Config {
 		BindPort:             7496,
 		TcpTimeout:           10 * time.Second,
 		PingTimeout:          500 * time.Millisecond,
-		ProbeInterval:        1 * time.Second,
+		ProbeInterval:        1500 * time.Millisecond, // at least 3 times more than PingTimeout
 		NumIndirectChecks:    3,
 		EnableCompression:    true,
 		EncryptionVersion:    0,
