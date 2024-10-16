@@ -71,13 +71,13 @@ func (m *Memberlist) handleUdpMsg(msg []byte, from *net.UDPAddr, timestamp time.
 	// msg that can be handled quickly
 	switch mType {
 	case compoundMsg:
-		// m.handleCompound(buf, from, timestamp)
+		m.handleCompound(msg, from, timestamp)
 	case pingMsg:
 		m.handlePing(msg, from)
-	case indirectPingMsg:
-		m.handleIndirectPing(msg, from)
 	case ackMsg:
 		m.handleAck(msg, from, timestamp)
+	case indirectPingMsg:
+		m.handleIndirectPing(msg, from)
 	case indirectAckMsg:
 		m.handleIndirectAck(msg, from)
 	default:
@@ -104,6 +104,95 @@ func (m *Memberlist) handleCompound(msg []byte, from *net.UDPAddr, timestamp tim
 	}
 }
 
+func (m *Memberlist) handlePing(buf []byte, from *net.UDPAddr) {
+	var p ping
+	if err := decode(buf, &p); err != nil {
+		// m.logger.Printf("[ERR] memberlist: Failed to decode ping request: %s %s", err, LogAddress(from))
+		return
+	}
+
+	// If node is provided, verify that it is for us
+	if p.Node != "" && p.Node != m.config.ID {
+		// m.logger.Printf("[WARN] memberlist: Got ping for unexpected node '%s' %s", p.Node, LogAddress(from))
+		return
+	}
+	var a ack
+	a.SeqNo = p.SeqNo
+	if m.pingMng.usrPing != nil {
+		a.Payload = m.pingMng.usrPing.Payload()
+	}
+	addr := from
+	if len(p.SourceIP) > 0 && p.SourcePort > 0 {
+		addr = &net.UDPAddr{IP: p.SourceIP, Port: int(p.SourcePort)}
+	}
+
+	if err := m.encodeAndSendUdp(addr, ackMsg, &a); err != nil {
+		// m.logger.Printf("[ERR] memberlist: Failed to send ack: %s", err)
+	}
+}
+
+func (m *Memberlist) handleAck(buf []byte, from net.Addr, timestamp time.Time) {
+	var a ack
+	if err := decode(buf, &a); err != nil {
+		// m.logger.Printf("[ERR] memberlist: Failed to decode ack response: %s %s", err, LogAddress(from))
+		return
+	}
+	m.pingMng.invokeAckHandler(a, timestamp)
+}
+
+func (m *Memberlist) handleIndirectPing(msg []byte, from *net.UDPAddr) {
+	var ind indirectPing
+	if err := decode(msg, &ind); err != nil {
+		// m.logger.Printf("[ERR] memberlist: Failed to decode indirect ping request: %s %s", err, LogAddress(from))
+		return
+	}
+
+	// get address of requestor
+	addr := from
+	if len(ind.SourceIP) > 0 && ind.SourcePort > 0 {
+		addr = &net.UDPAddr{IP: ind.SourceIP, Port: int(ind.SourcePort)}
+	}
+	node := &nodeState{
+		Node: &Node{
+			ID:   ind.Node,
+			IP:   ind.IP,
+			Port: ind.Port,
+		},
+		State: StateAlive,
+	}
+	go func() {
+		ok := m.Ping(node)
+		indAck := indirectAck{ind.SeqNo, true}
+		if !ok {
+			indAck.Success = false
+		}
+		if err := m.encodeAndSendUdp(addr, indirectAckMsg, indAck); err != nil {
+			// log error
+		}
+	}()
+
+}
+
+func (m *Memberlist) handleIndirectAck(msg []byte, from *net.UDPAddr) {
+	var in indirectAck
+	if err := decode(msg, &in); err != nil {
+		// log error with from
+		return
+	}
+	m.pingMng.invokeIndirectAckHandler(in)
+}
+
+type longRunMsg struct {
+	mType msgType
+	msg   []byte
+	from  net.Addr
+}
+
+// TODO: passing userMsg to a channel for user to handle?
+func isLongRunMsg(t msgType) bool {
+	return t == aliveMsg || t == suspectMsg || t == deadMsg || t == leaveMsg || t == userMsg
+}
+
 type longRunMsgManager struct {
 	highPriorQueue *list.List
 	lowPriorQueue  *list.List
@@ -119,17 +208,6 @@ func newLongRunMsgManager(qDepth int) *longRunMsgManager {
 		maxQueueDepth:  qDepth,
 		gotMsgCh:       make(chan struct{}),
 	}
-}
-
-type longRunMsg struct {
-	mType msgType
-	msg   []byte
-	from  net.Addr
-}
-
-// TODO: passing userMsg to a channel for user to handle?
-func isLongRunMsg(t msgType) bool {
-	return t == aliveMsg || t == suspectMsg || t == deadMsg || t == leaveMsg || t == userMsg
 }
 
 func (mng *longRunMsgManager) queueLongRunMsg(t msgType, msg []byte, from net.Addr) {

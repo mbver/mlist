@@ -1,32 +1,19 @@
 package memberlist
 
 import (
-	"net"
 	"sync"
 	"sync/atomic"
 	"time"
 )
 
-type ping struct {
-	SeqNo      uint32
-	Node       string
-	SourceIP   []byte `codec:",omitempty"`
-	SourcePort uint16 `codec:",omitempty"`
-}
-
-type ack struct {
-	SeqNo   uint32
-	Payload []byte
-}
-
-type timedAck struct {
-	payload   []byte
-	timestamp time.Time
-}
-
 type ackHandler struct {
 	timer *time.Timer
 	ackCh chan timedAck
+}
+
+type PingDelegate interface {
+	Payload() []byte
+	FinishPing(from *Node, rtt time.Duration, payload []byte)
 }
 
 type pingManager struct {
@@ -46,6 +33,23 @@ func newPingManager() *pingManager {
 
 func (mng *pingManager) nextSeqNo() uint32 { // will wrap arround
 	return atomic.AddUint32(&mng.seqNo, 1)
+}
+
+type ping struct {
+	SeqNo      uint32
+	Node       string
+	SourceIP   []byte `codec:",omitempty"`
+	SourcePort uint16 `codec:",omitempty"`
+}
+
+type ack struct {
+	SeqNo   uint32
+	Payload []byte
+}
+
+type timedAck struct {
+	payload   []byte
+	timestamp time.Time
 }
 
 func (mng *pingManager) setAckHandler(seqNo uint32, ch chan timedAck, timeout time.Duration) {
@@ -75,18 +79,70 @@ func (mng *pingManager) invokeAckHandler(a ack, timestamp time.Time) {
 	}
 }
 
-func (m *Memberlist) handleAck(buf []byte, from net.Addr, timestamp time.Time) {
-	var a ack
-	if err := decode(buf, &a); err != nil {
-		// m.logger.Printf("[ERR] memberlist: Failed to decode ack response: %s %s", err, LogAddress(from))
-		return
+func buddyPingMsg(p ping, s suspect) ([]byte, error) {
+	var msgs [][]byte
+	if buf, err := encode(pingMsg, p); err != nil {
+		return nil, err
+	} else {
+		msgs = append(msgs, buf)
 	}
-	m.pingMng.invokeAckHandler(a, timestamp)
+	if buf, err := encode(suspectMsg, &s); err != nil {
+		return nil, err
+	} else {
+		msgs = append(msgs, buf)
+	}
+	return packCompoundMsg(msgs), nil
 }
 
-type PingDelegate interface {
-	Payload() []byte
-	FinishPing(from *Node, rtt time.Duration, payload []byte)
+type indirectPing struct {
+	SeqNo      uint32
+	IP         []byte
+	Port       uint16
+	Node       string
+	SourceIP   []byte `codec:",omitempty"`
+	SourcePort uint16 `codec:",omitempty"`
+}
+
+type indirectAck struct {
+	SeqNo   uint32
+	Success bool
+}
+
+// set ackHandler missing?
+type indirectAckHandler struct {
+	ackCh  chan struct{}
+	nNacks *int32
+	timer  *time.Timer
+}
+
+func (mng *pingManager) setIndirectAckHandler(seqNo uint32, ackCh chan struct{}, nNacks *int32, timeout time.Duration) {
+	t := time.AfterFunc(timeout, func() {
+		mng.l.Lock()
+		delete(mng.indirectAckHandlers, seqNo)
+		mng.l.Unlock()
+	})
+	mng.l.Lock()
+	defer mng.l.Unlock()
+	mng.indirectAckHandlers[seqNo] = &indirectAckHandler{ackCh, nNacks, t}
+}
+
+func (mng *pingManager) invokeIndirectAckHandler(in indirectAck) {
+	mng.l.Lock()
+	defer mng.l.Unlock()
+	h, ok := mng.indirectAckHandlers[in.SeqNo]
+	if !ok {
+		return
+	}
+	if !in.Success {
+		atomic.AddInt32(h.nNacks, 1)
+		return
+	}
+	h.timer.Stop()
+	delete(mng.indirectAckHandlers, in.SeqNo)
+	select {
+	case h.ackCh <- struct{}{}:
+	default:
+	}
 }
 
 // run the handler for seqNo when its ack arrives. delete handler from the map.
@@ -140,80 +196,6 @@ func (m *Memberlist) Ping(node *nodeState) bool {
 	}
 }
 
-func buddyPingMsg(p ping, s suspect) ([]byte, error) {
-	var msgs [][]byte
-	if buf, err := encode(pingMsg, p); err != nil {
-		return nil, err
-	} else {
-		msgs = append(msgs, buf)
-	}
-	if buf, err := encode(suspectMsg, &s); err != nil {
-		return nil, err
-	} else {
-		msgs = append(msgs, buf)
-	}
-	return packCompoundMsg(msgs), nil
-}
-
-func (m *Memberlist) handlePing(buf []byte, from *net.UDPAddr) {
-	var p ping
-	if err := decode(buf, &p); err != nil {
-		// m.logger.Printf("[ERR] memberlist: Failed to decode ping request: %s %s", err, LogAddress(from))
-		return
-	}
-
-	// If node is provided, verify that it is for us
-	if p.Node != "" && p.Node != m.config.ID {
-		// m.logger.Printf("[WARN] memberlist: Got ping for unexpected node '%s' %s", p.Node, LogAddress(from))
-		return
-	}
-	var a ack
-	a.SeqNo = p.SeqNo
-	if m.pingMng.usrPing != nil {
-		a.Payload = m.pingMng.usrPing.Payload()
-	}
-	addr := from
-	if len(p.SourceIP) > 0 && p.SourcePort > 0 {
-		addr = &net.UDPAddr{IP: p.SourceIP, Port: int(p.SourcePort)}
-	}
-
-	if err := m.encodeAndSendUdp(addr, ackMsg, &a); err != nil {
-		// m.logger.Printf("[ERR] memberlist: Failed to send ack: %s", err)
-	}
-}
-
-type indirectPing struct {
-	SeqNo      uint32
-	IP         []byte
-	Port       uint16
-	Node       string
-	SourceIP   []byte `codec:",omitempty"`
-	SourcePort uint16 `codec:",omitempty"`
-}
-
-type indirectAck struct {
-	SeqNo   uint32
-	Success bool
-}
-
-// set ackHandler missing?
-type indirectAckHandler struct {
-	ackCh  chan struct{}
-	nNacks *int32
-	timer  *time.Timer
-}
-
-func (mng *pingManager) setIndirectAckHandler(seqNo uint32, ackCh chan struct{}, nNacks *int32, timeout time.Duration) {
-	t := time.AfterFunc(timeout, func() {
-		mng.l.Lock()
-		delete(mng.indirectAckHandlers, seqNo)
-		mng.l.Unlock()
-	})
-	mng.l.Lock()
-	defer mng.l.Unlock()
-	mng.indirectAckHandlers[seqNo] = &indirectAckHandler{ackCh, nNacks, t}
-}
-
 type indirectPingResult struct {
 	success bool
 	nNacks  int
@@ -264,67 +246,6 @@ func (m *Memberlist) IndirectPing(node *nodeState, timeout time.Duration) chan i
 
 	}()
 	return resultCh
-}
-
-func (m *Memberlist) handleIndirectPing(msg []byte, from *net.UDPAddr) {
-	var ind indirectPing
-	if err := decode(msg, &ind); err != nil {
-		// m.logger.Printf("[ERR] memberlist: Failed to decode indirect ping request: %s %s", err, LogAddress(from))
-		return
-	}
-
-	// get address of requestor
-	addr := from
-	if len(ind.SourceIP) > 0 && ind.SourcePort > 0 {
-		addr = &net.UDPAddr{IP: ind.SourceIP, Port: int(ind.SourcePort)}
-	}
-	node := &nodeState{
-		Node: &Node{
-			ID:   ind.Node,
-			IP:   ind.IP,
-			Port: ind.Port,
-		},
-		State: StateAlive,
-	}
-	go func() {
-		ok := m.Ping(node)
-		indAck := indirectAck{ind.SeqNo, true}
-		if !ok {
-			indAck.Success = false
-		}
-		if err := m.encodeAndSendUdp(addr, indirectAckMsg, indAck); err != nil {
-			// log error
-		}
-	}()
-
-}
-
-func (m *Memberlist) handleIndirectAck(msg []byte, from *net.UDPAddr) {
-	var in indirectAck
-	if err := decode(msg, &in); err != nil {
-		// log error with from
-		return
-	}
-	m.pingMng.invokeIndirectAckHandler(in)
-}
-
-func (mng *pingManager) invokeIndirectAckHandler(in indirectAck) {
-	mng.l.Lock()
-	defer mng.l.Unlock()
-	h, ok := mng.indirectAckHandlers[in.SeqNo]
-	if !ok {
-		return
-	}
-	if !in.Success {
-		atomic.AddInt32(h.nNacks, 1)
-		return
-	}
-	h.timer.Stop()
-	delete(mng.indirectAckHandlers, in.SeqNo)
-	select {
-	case h.ackCh <- struct{}{}:
-	default:
-	}
 }
 
 func (m *Memberlist) TcpPing(node *nodeState, timeout time.Duration) chan bool {
