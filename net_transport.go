@@ -222,7 +222,7 @@ func (t *NetTransport) PacketCh() <-chan *Packet {
 	return t.packetCh
 }
 
-func (t *NetTransport) GetFirstConn() (*net.UDPConn, error) {
+func (t *NetTransport) getFirstConn() (*net.UDPConn, error) {
 	t.l.Lock()
 	defer t.l.Unlock()
 	if t.shutdown {
@@ -232,7 +232,7 @@ func (t *NetTransport) GetFirstConn() (*net.UDPConn, error) {
 }
 
 func (t *NetTransport) SendUdp(msg []byte, addr *net.UDPAddr) (time.Time, error) {
-	conn, err := t.GetFirstConn()
+	conn, err := t.getFirstConn()
 	if err != nil {
 		return time.Time{}, err
 	}
@@ -264,7 +264,7 @@ func (t *NetTransport) GetFirstAddr() (net.IP, int, error) {
 			return nil, 0, fmt.Errorf("failed to parse advertise address: %q", ip)
 		}
 	} else {
-		conn, err := t.GetFirstConn()
+		conn, err := t.getFirstConn()
 		if err != nil {
 			return nil, 0, err
 		}

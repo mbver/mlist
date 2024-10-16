@@ -111,7 +111,7 @@ func TestPing_DirectIndirectTcp(t *testing.T) {
 		t.Fatalf("expect no timeout")
 	}
 
-	conn, _ := m2.transport.GetFirstConn()
+	conn, _ := m2.transport.getFirstConn()
 	conn.Close()
 
 	timeout := m1.config.ProbeInterval - m1.config.PingTimeout // 2 * PingTimeout
