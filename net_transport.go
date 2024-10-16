@@ -361,12 +361,22 @@ func (t *NetTransport) PacketCh() <-chan *Packet {
 	return t.packetCh
 }
 
+func (t *NetTransport) GetFirstConn() (*net.UDPConn, error) {
+	t.l.Lock()
+	defer t.l.Unlock()
+	if t.shutdown {
+		return nil, fmt.Errorf("transport shutdown")
+	}
+	return t.udpConns[0], nil
+}
+
 func (t *NetTransport) SendUdp(msg []byte, addr *net.UDPAddr) (time.Time, error) {
-	if t.hasShutdown() {
-		return time.Time{}, fmt.Errorf("transport shutdown")
+	conn, err := t.GetFirstConn()
+	if err != nil {
+		return time.Time{}, err
 	}
 	// use the first udp conn
-	_, err := t.udpConns[0].WriteTo(msg, addr)
+	_, err = conn.WriteTo(msg, addr)
 	return time.Now(), err
 }
 
@@ -430,9 +440,6 @@ func (m *Memberlist) encodeAndSendUdp(addr *net.UDPAddr, mType msgType, msg inte
 }
 
 func (t *NetTransport) GetFirstAddr() (net.IP, int, error) {
-	if t.hasShutdown() {
-		return nil, 0, fmt.Errorf("transport shutdown")
-	}
 	var ip net.IP
 	// if we are listening on all interfaces, choose a private interface's address
 	if t.bindAddrs[0] == "0.0.0.0" {
@@ -450,7 +457,11 @@ func (t *NetTransport) GetFirstAddr() (net.IP, int, error) {
 			return nil, 0, fmt.Errorf("failed to parse advertise address: %q", ip)
 		}
 	} else {
-		ip = t.tcpListeners[0].Addr().(*net.TCPAddr).IP
+		conn, err := t.GetFirstConn()
+		if err != nil {
+			return nil, 0, err
+		}
+		ip = conn.LocalAddr().(*net.UDPAddr).IP
 	}
 	return ip, t.bindPort, nil
 }

@@ -344,7 +344,7 @@ func (m *Memberlist) TcpPing(node *nodeState, timeout time.Duration) chan bool {
 			SourceIP:   localIp,
 			SourcePort: localPort,
 		}
-		addr := node.Node.TCPAddress().String()
+		addr := node.Node.UDPAddress().String() // same address for udp and tcp
 		conn, err := m.transport.DialTimeout(addr, timeout)
 		if err != nil {
 			result <- false

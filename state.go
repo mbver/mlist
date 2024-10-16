@@ -27,13 +27,6 @@ func (n *Node) UDPAddress() *net.UDPAddr {
 	}
 }
 
-func (n *Node) TCPAddress() *net.TCPAddr {
-	return &net.TCPAddr{
-		IP:   n.IP,
-		Port: int(n.Port),
-	}
-}
-
 type nodeState struct {
 	Node  *Node
 	Lives uint32
