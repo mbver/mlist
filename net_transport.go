@@ -74,7 +74,7 @@ func (m *Memberlist) unpackPacket(msg []byte, packetLabel string) ([]byte, error
 
 	if msgType(msg[0]) == compressMsg {
 		var err error
-		msg, err = decompressMsg(msg)
+		msg, err = decompressMsg(msg[1:])
 		if err != nil {
 			return nil, err
 		}

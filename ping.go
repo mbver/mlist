@@ -242,7 +242,7 @@ func (m *Memberlist) IndirectPing(node *nodeState, timeout time.Duration) chan i
 
 		ind := indirectPing{
 			SeqNo:      m.pingMng.nextSeqNo(),
-			Addr:       node.Node.Address(),
+			Addr:       node.Node.Addr.String(),
 			Port:       node.Node.Port,
 			Node:       node.Node.ID,
 			SourceAddr: localAddr.String(),
@@ -277,15 +277,13 @@ func (m *Memberlist) handleIndirectPing(msg []byte, from net.Addr) {
 		// m.logger.Printf("[ERR] memberlist: Failed to decode indirect ping request: %s %s", err, LogAddress(from))
 		return
 	}
-
 	// get address of requestor
 	var addr string
 	if len(ind.SourceAddr) > 0 && ind.SourcePort > 0 {
-		addr = joinHostPort(net.IP(ind.SourceAddr).String(), ind.SourcePort)
+		addr = joinHostPort(ind.SourceAddr, ind.SourcePort)
 	} else {
 		addr = from.String()
 	}
-
 	var ok bool
 	defer func() {
 		indAck := indirectAck{ind.SeqNo, true}
@@ -296,18 +294,13 @@ func (m *Memberlist) handleIndirectPing(msg []byte, from net.Addr) {
 			// log error
 		}
 	}()
-	node := m.GetNodeState(ind.Node)
-	if node == nil {
-		ok = false
-		return
-	}
-	if node.Node.Address() != ind.Addr {
-		ok = false
-		return
-	}
-	if node.DeadOrLeft() {
-		ok = false
-		return
+	node := &nodeState{
+		Node: &Node{
+			Addr: net.ParseIP(ind.Addr),
+			Port: ind.Port,
+			ID:   ind.Node,
+		},
+		State: StateAlive,
 	}
 	ok = m.Ping(node)
 }
