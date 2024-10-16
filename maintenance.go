@@ -42,8 +42,8 @@ func (m *Memberlist) scheduleFuncDynamic(interval time.Duration, stopCh chan str
 func (m *Memberlist) gossip() {}
 
 func (m *Memberlist) pickRandomNodes(numNodes int, acceptFn func(*nodeState) bool) []*nodeState {
-	m.nodeLock.RLock()
-	defer m.nodeLock.RUnlock()
+	m.nodeL.RLock()
+	defer m.nodeL.RUnlock()
 	n := len(m.nodes)
 	picked := make([]*nodeState, 0, numNodes)
 
@@ -74,7 +74,49 @@ func (m *Memberlist) nextProbeNode() (*nodeState, error) {
 	return nil, nil
 }
 
-func (m *Memberlist) probeNode(node *nodeState) {}
+func (m *Memberlist) probeNode(node *nodeState) {
+	pingTimeout := m.awr.ScaleTimeout(m.config.PingTimeout)
+	probeTimeout := m.awr.ScaleTimeout(m.config.ProbeTimeout)
+	success := m.Ping(node, pingTimeout)
+	if success {
+		m.awr.Punish(-1) // improve health
+		return
+	}
+
+	timeout := probeTimeout - pingTimeout
+	indirectCh := m.IndirectPing(node, timeout)
+	tcpCh := m.TcpPing(node, timeout)
+	var indirectRes indirectPingResult
+
+WAIT:
+	for {
+		select {
+		case indirectRes = <-indirectCh:
+			if indirectRes.success {
+				success = true
+				break WAIT
+			}
+		case res := <-tcpCh:
+			if res {
+				success = true
+				break WAIT
+			}
+		case <-time.After(timeout + 10*time.Millisecond):
+			break WAIT
+		}
+	}
+
+	if success {
+		m.awr.Punish(-1) // improve health
+		return
+	}
+
+	missedNacks := indirectRes.numNode - indirectRes.nNacks
+	m.awr.Punish(missedNacks)
+	// m.logger.Printf("[INFO] memberlist: Suspect %s has failed, no acks received", node.Name)
+	s := suspect{Lives: node.Lives, Node: node.Node.ID, From: m.config.ID}
+	m.suspectNode(&s)
+}
 
 // reap
 func (m *Memberlist) resetNodes() {}

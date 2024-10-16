@@ -49,10 +49,10 @@ type TransmitCapQueue struct {
 
 func (m *Memberlist) NewBroadcastQueue() *TransmitCapQueue {
 	return &TransmitCapQueue{
-		NumNodes: m.numNodes,
-		// RetransmitScale: ,
-		queue:  *heap.NewHeap(),
-		exists: map[string]*TransmitCapItem{},
+		NumNodes:      m.numNodes,
+		TransmitScale: m.config.RetransmitScale,
+		queue:         *heap.NewHeap(),
+		exists:        map[string]*TransmitCapItem{},
 	}
 }
 

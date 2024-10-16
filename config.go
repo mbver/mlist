@@ -10,7 +10,7 @@ type Config struct {
 	AdvertisePort        int
 	TcpTimeout           time.Duration
 	PingTimeout          time.Duration
-	ProbeInterval        time.Duration
+	ProbeTimeout         time.Duration
 	Label                string
 	EnableCompression    bool
 	EncryptionVersion    encryptionVersion
@@ -18,6 +18,8 @@ type Config struct {
 	MaxLongRunQueueDepth int
 	MaxConcurentPushPull int
 	NumIndirectChecks    int
+	RetransmitScale      int
+	MaxAwarenessHealth   int
 }
 
 func DefaultLANConfig(id string) *Config {
@@ -27,10 +29,12 @@ func DefaultLANConfig(id string) *Config {
 		BindPort:             7496,
 		TcpTimeout:           10 * time.Second,
 		PingTimeout:          500 * time.Millisecond,
-		ProbeInterval:        1500 * time.Millisecond, // at least 3 times more than PingTimeout
+		ProbeTimeout:         1500 * time.Millisecond, // at least 3 times more than PingTimeout
 		NumIndirectChecks:    3,
 		EnableCompression:    true,
 		EncryptionVersion:    0,
 		MaxLongRunQueueDepth: 1024,
+		RetransmitScale:      4,
+		MaxAwarenessHealth:   8,
 	}
 }

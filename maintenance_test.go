@@ -50,3 +50,5 @@ func TestPickRandomNodes(t *testing.T) {
 		}
 	}
 }
+
+func TestProbeNode(t *testing.T) {}

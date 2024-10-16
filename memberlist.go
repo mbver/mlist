@@ -7,9 +7,11 @@ import (
 )
 
 type Memberlist struct {
+	awr         *awareness
 	config      *Config
 	keyring     *Keyring
 	transport   *NetTransport
+	shutdownL   sync.Mutex // guard shutdown, shutdownCh
 	shutdownCh  chan struct{}
 	shutdown    int32
 	mbroadcasts *TransmitCapQueue
@@ -17,7 +19,7 @@ type Memberlist struct {
 	longRunMng  *longRunMsgManager
 	pingMng     *pingManager
 	numPushPull uint32
-	nodeLock    sync.RWMutex
+	nodeL       sync.RWMutex // guard nodes, nodeMap
 	nodes       []*nodeState
 	nodeMap     map[string]*nodeState
 }
@@ -76,8 +78,8 @@ func (m *Memberlist) hasLeft() bool {
 
 // return a clone of node state
 func (m *Memberlist) GetNodeState(id string) *nodeState {
-	m.nodeLock.RLock()
-	defer m.nodeLock.RUnlock()
+	m.nodeL.RLock()
+	defer m.nodeL.RUnlock()
 	n, ok := m.nodeMap[id]
 	if !ok {
 		return nil

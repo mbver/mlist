@@ -147,7 +147,7 @@ func (mng *pingManager) invokeIndirectAckHandler(in indirectAck) {
 
 // run the handler for seqNo when its ack arrives. delete handler from the map.
 // include buddy mechanism. they are almost the same
-func (m *Memberlist) Ping(node *nodeState) bool {
+func (m *Memberlist) Ping(node *nodeState, timeout time.Duration) bool {
 	localIp, localPort, err := m.GetAdvertiseAddr()
 	if err != nil {
 		// TODO; log error
@@ -162,7 +162,7 @@ func (m *Memberlist) Ping(node *nodeState) bool {
 	}
 
 	ackCh := make(chan timedAck)
-	m.pingMng.setAckHandler(p.SeqNo, ackCh, m.config.PingTimeout)
+	m.pingMng.setAckHandler(p.SeqNo, ackCh, timeout)
 	sent := time.Now()
 
 	if node.State == StateAlive {
@@ -190,7 +190,7 @@ func (m *Memberlist) Ping(node *nodeState) bool {
 			m.pingMng.usrPing.FinishPing(node.Node, rtt, a.payload)
 		}
 		return true
-	case <-time.After(m.config.PingTimeout):
+	case <-time.After(timeout):
 		// m.logger.Printf("[DEBUG] memberlist: Failed UDP ping: %s (timeout reached)", node.Name)
 		return false
 	}
@@ -199,6 +199,7 @@ func (m *Memberlist) Ping(node *nodeState) bool {
 type indirectPingResult struct {
 	success bool
 	nNacks  int
+	numNode int
 }
 
 func (m *Memberlist) IndirectPing(node *nodeState, timeout time.Duration) chan indirectPingResult {
@@ -207,7 +208,7 @@ func (m *Memberlist) IndirectPing(node *nodeState, timeout time.Duration) chan i
 		localIp, localPort, err := m.GetAdvertiseAddr()
 		if err != nil {
 			// log error
-			resultCh <- indirectPingResult{false, 0}
+			resultCh <- indirectPingResult{false, 0, 0}
 			return
 		}
 
@@ -217,6 +218,11 @@ func (m *Memberlist) IndirectPing(node *nodeState, timeout time.Duration) chan i
 				n.Node.ID != node.Node.ID &&
 				n.State == StateAlive
 		})
+
+		if len(peers) == 0 {
+			resultCh <- indirectPingResult{false, 0, 0}
+			return
+		}
 
 		ind := indirectPing{
 			SeqNo:      m.pingMng.nextSeqNo(),
@@ -232,16 +238,16 @@ func (m *Memberlist) IndirectPing(node *nodeState, timeout time.Duration) chan i
 		m.pingMng.setIndirectAckHandler(ind.SeqNo, ackCh, &nNacks, timeout)
 		for _, peer := range peers {
 			if err := m.encodeAndSendUdp(peer.Node.UDPAddress(), indirectPingMsg, &ind); err != nil {
-				resultCh <- indirectPingResult{false, 0}
+				resultCh <- indirectPingResult{false, 0, 0}
 				return
 			}
 		}
 
 		select {
 		case <-ackCh:
-			resultCh <- indirectPingResult{true, 0}
+			resultCh <- indirectPingResult{true, 0, 0}
 		case <-time.After(timeout):
-			resultCh <- indirectPingResult{false, int(atomic.LoadInt32(&nNacks))}
+			resultCh <- indirectPingResult{false, int(atomic.LoadInt32(&nNacks)), len(peers)}
 		}
 
 	}()
