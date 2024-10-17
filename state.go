@@ -2,7 +2,6 @@ package memberlist
 
 import (
 	"net"
-	"time"
 )
 
 type StateType int
@@ -73,22 +72,3 @@ func (m *Memberlist) leaveNode(l *leave) {}
 func (m *Memberlist) refute(lives int) {}
 
 type stateToMerge struct{}
-
-type suspicion struct{}
-
-func newSuspicion(
-	minTimeout time.Duration,
-	maxTimeout time.Duration,
-	confirmCap int, from string,
-	timeoutFn func(uint32),
-) *suspicion {
-	return nil
-}
-
-func (s *suspicion) remainingTime() time.Duration {
-	return 0
-}
-
-func (s *suspicion) Confirm(from string) bool {
-	return false
-}
