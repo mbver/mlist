@@ -18,6 +18,7 @@ type Memberlist struct {
 	ubroadcasts UserBroadcasts
 	longRunMng  *longRunMsgManager
 	pingMng     *pingManager
+	eventMng    *EventManager
 	numPushPull uint32
 	nodeL       sync.RWMutex // guard nodes, nodeMap
 	nodes       []*nodeState

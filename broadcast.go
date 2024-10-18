@@ -106,18 +106,18 @@ func transmitLimit(scale, n int) int {
 	return scale * nodeScale
 }
 
-func (q *TransmitCapQueue) QueueMsg(name string, t msgType, msg []byte, notify chan<- struct{}) {
+func (q *TransmitCapQueue) QueueMsg(name string, t msgType, msg interface{}, notify chan<- struct{}) {
 	q.l.Lock()
 	defer q.l.Unlock()
 
-	msg, err := encode(t, msg)
+	encoded, err := encode(t, msg)
 	if err != nil {
 		// log error
 		return
 	}
 	item := &TransmitCapItem{
 		name:   name,
-		msg:    msg,
+		msg:    encoded,
 		notify: notify,
 	}
 	item.id = q.idSeq
@@ -184,6 +184,6 @@ func (m *Memberlist) getBroadcasts(overhead, limit int) [][]byte {
 }
 
 // name is used to invalidate message, name = "" will not invalidate
-func (m *Memberlist) broadcast(name string, t msgType, msg []byte, notify chan<- struct{}) {
+func (m *Memberlist) broadcast(name string, t msgType, msg interface{}, notify chan<- struct{}) {
 	m.mbroadcasts.QueueMsg(name, t, msg, notify)
 }

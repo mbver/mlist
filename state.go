@@ -23,6 +23,15 @@ type Node struct {
 	Tags []byte
 }
 
+func (n *Node) Clone() *Node {
+	return &Node{
+		ID:   n.ID,
+		IP:   copyBytes(n.IP),
+		Port: n.Port,
+		Tags: copyBytes(n.Tags),
+	}
+}
+
 func (n *Node) UDPAddress() *net.UDPAddr {
 	return &net.UDPAddr{
 		IP:   n.IP,
@@ -43,11 +52,7 @@ func (n *nodeState) DeadOrLeft() bool {
 
 func (n *nodeState) Clone() *nodeState {
 	return &nodeState{
-		Node: &Node{
-			ID:   n.Node.ID,
-			IP:   copyBytes(n.Node.IP),
-			Port: n.Node.Port,
-		},
+		Node:        n.Node.Clone(),
 		Lives:       n.Lives,
 		State:       n.State,
 		StateChange: n.StateChange,
@@ -91,18 +96,17 @@ func (m *Memberlist) aliveNode(a *alive, notify chan struct{}) {
 	var rebroadcast bool
 	var notifyJoin bool
 	var notifyUpdate bool
+	var newNode *Node
+
 	defer func() {
 		if rebroadcast {
-			// m.encodeBroadcastNotify(state.Node, aliveMsg, a, notify) // change later to fit new broadcast signature
+			m.broadcast(newNode.ID, aliveMsg, a, notify)
 		}
-		// if m.Events == nil {
-		// 	return
-		// }
 		if notifyJoin {
-			// m.config.Events.NotifJoin(state.Node) // change later to fit new design. maybe joinCh to receive join events
+			m.eventMng.NotifyJoin(newNode)
 		}
 		if notifyUpdate {
-			// 	m.config.Events.NotifyUpdate(state.Node) // change later, maybe using a channel. maybe dropping it. tags is managed in memberlist
+			m.eventMng.NotifyUpdate(newNode)
 		}
 	}()
 
@@ -131,9 +135,12 @@ func (m *Memberlist) aliveNode(a *alive, notify chan struct{}) {
 
 		rebroadcast = true
 		notifyJoin = true
+		newNode = node.Node.Clone()
 		return
 	}
 
+	// make sure to rejoin with higher Lives than when we stopped
+	// so don't have to handle the case a.Lives == node.Lives specially
 	if a.Lives <= node.Lives {
 		return
 	}
@@ -152,9 +159,12 @@ func (m *Memberlist) aliveNode(a *alive, notify chan struct{}) {
 		node.State = StateAlive
 		node.StateChange = time.Now()
 	}
+	newNode = node.Node.Clone()
 }
 
-func (m *Memberlist) suspectNode(s *suspect) {}
+func (m *Memberlist) suspectNode(s *suspect) {
+
+}
 
 func (m *Memberlist) deadNode(d *dead) {}
 
