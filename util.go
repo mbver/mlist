@@ -186,3 +186,9 @@ func UniqueID() string {
 	str := id.String()
 	return strings.ReplaceAll(str, "-", "")
 }
+
+func copyBytes(s []byte) []byte {
+	res := make([]byte, len(s))
+	copy(res, s)
+	return s
+}

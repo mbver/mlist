@@ -29,7 +29,7 @@ func (m *Memberlist) scheduleFuncDynamic(interval time.Duration, stopCh chan str
 	jitter := time.Duration(uint64(rand.Int63()) % uint64(interval))
 	time.Sleep(jitter) // wait random fraction of interval to avoid thundering herd
 	for {
-		scaledInterval := scaleFunc(interval, m.numNodes())
+		scaledInterval := scaleFunc(interval, m.getNumNodes())
 		select {
 		case <-time.After(scaledInterval):
 			f()

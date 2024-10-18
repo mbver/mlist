@@ -22,6 +22,8 @@ type Memberlist struct {
 	nodeL       sync.RWMutex // guard nodes, nodeMap
 	nodes       []*nodeState
 	nodeMap     map[string]*nodeState
+	numNodes    int32 // allow concurrent access
+	suspicions  map[string]suspicion
 }
 
 type MemberlistBuilder struct{}
@@ -50,8 +52,8 @@ func (m *Memberlist) NumActive() int {
 	return 0
 }
 
-func (m *Memberlist) numNodes() int {
-	return 0
+func (m *Memberlist) getNumNodes() int {
+	return int(atomic.LoadInt32(&m.numNodes))
 }
 
 // consider dropping

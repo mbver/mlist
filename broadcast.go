@@ -49,7 +49,7 @@ type TransmitCapQueue struct {
 
 func (m *Memberlist) NewBroadcastQueue() *TransmitCapQueue {
 	return &TransmitCapQueue{
-		NumNodes:      m.numNodes,
+		NumNodes:      m.getNumNodes,
 		TransmitScale: m.config.RetransmitScale,
 		queue:         *heap.NewHeap(),
 		exists:        map[string]*TransmitCapItem{},
@@ -87,8 +87,7 @@ func (q *TransmitCapQueue) GetMessages(overhead, size int) [][]byte {
 	transLimit := transmitLimit(q.TransmitScale, q.NumNodes())
 	msgs := [][]byte{}
 	for _, item := range picked {
-		msg := append([]byte{}, item.msg...) // copy
-		msgs = append(msgs, msg)
+		msgs = append(msgs, copyBytes(item.msg))
 		item.transmits++
 		if item.transmits >= transLimit {
 			item.Finish()

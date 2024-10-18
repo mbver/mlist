@@ -45,8 +45,7 @@ func (r *Keyring) AddKey(key []byte) error {
 			return nil
 		}
 	}
-	key = append([]byte{}, key...) // copy
-	r.keys = append(r.keys, key)
+	r.keys = append(r.keys, copyBytes(key))
 	return nil
 }
 
@@ -62,7 +61,7 @@ func (r *Keyring) UseKey(key []byte) error {
 	defer r.lock.Unlock()
 	for _, k := range r.keys {
 		if bytes.Equal(key, k) {
-			r.primaryKey = append([]byte{}, key...) // copy
+			r.primaryKey = copyBytes(key)
 			return nil
 		}
 	}
@@ -93,7 +92,7 @@ func (r *Keyring) GetKeys() [][]byte {
 	defer r.lock.Unlock()
 	keys := make([][]byte, len(r.keys))
 	for i, k := range r.keys {
-		keys[i] = append([]byte{}, k...) // copy
+		keys[i] = copyBytes(k)
 	}
 	return keys
 }
@@ -101,5 +100,5 @@ func (r *Keyring) GetKeys() [][]byte {
 func (r *Keyring) GetPrimaryKey() []byte {
 	r.lock.Lock()
 	defer r.lock.Unlock()
-	return append([]byte{}, r.primaryKey...) // copy
+	return copyBytes(r.primaryKey)
 }
