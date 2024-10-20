@@ -22,7 +22,6 @@ const (
 	aliveMsg
 	suspectMsg
 	deadMsg
-	leaveMsg
 	pushPullMsg
 	compoundMsg
 	userMsg // User mesg, not handled by us
@@ -112,7 +111,7 @@ func (m *Memberlist) handlePing(buf []byte, from *net.UDPAddr) {
 	}
 
 	// If node is provided, verify that it is for us
-	if p.Node != "" && p.Node != m.config.ID {
+	if p.ID != "" && p.ID != m.config.ID {
 		// m.logger.Printf("[WARN] memberlist: Got ping for unexpected node '%s' %s", p.Node, LogAddress(from))
 		return
 	}
@@ -190,7 +189,7 @@ type longRunMsg struct {
 
 // TODO: passing userMsg to a channel for user to handle?
 func isLongRunMsg(t msgType) bool {
-	return t == aliveMsg || t == suspectMsg || t == deadMsg || t == leaveMsg || t == userMsg
+	return t == aliveMsg || t == suspectMsg || t == deadMsg || t == userMsg
 }
 
 type longRunMsgManager struct {
@@ -212,7 +211,7 @@ func newLongRunMsgManager(qDepth int) *longRunMsgManager {
 
 func (mng *longRunMsgManager) queueLongRunMsg(t msgType, msg []byte, from net.Addr) {
 	queue := mng.lowPriorQueue
-	if t == aliveMsg || t == leaveMsg { // alive msg is prioritized
+	if t == aliveMsg { // alive msg is prioritized
 		queue = mng.highPriorQueue
 	}
 
@@ -335,7 +334,7 @@ func (m *Memberlist) handlePingTcp(dec *codec.Decoder, conn net.Conn, streamLabe
 		return
 	}
 
-	if p.Node != "" && p.Node != m.config.ID {
+	if p.ID != "" && p.ID != m.config.ID {
 		// m.logger.Printf("[WARN] memberlist: Got ping for unexpected node %s %s", p.Node, LogConn(conn))
 		return
 	}

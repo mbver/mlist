@@ -37,7 +37,7 @@ func (mng *pingManager) nextSeqNo() uint32 { // will wrap arround
 
 type ping struct {
 	SeqNo      uint32
-	Node       string
+	ID         string
 	SourceIP   []byte `codec:",omitempty"`
 	SourcePort uint16 `codec:",omitempty"`
 }
@@ -156,7 +156,7 @@ func (m *Memberlist) Ping(node *nodeState, timeout time.Duration) bool {
 
 	p := ping{
 		SeqNo:      m.pingMng.nextSeqNo(),
-		Node:       node.Node.ID,
+		ID:         node.Node.ID,
 		SourceIP:   localIp,
 		SourcePort: localPort,
 	}
@@ -171,7 +171,7 @@ func (m *Memberlist) Ping(node *nodeState, timeout time.Duration) bool {
 			return false
 		}
 	} else { // state suspect, apply buddy mechanism so it can refute asap
-		s := suspect{Lives: node.Lives, Node: node.Node.ID, From: m.config.ID}
+		s := suspect{Lives: node.Lives, ID: node.Node.ID, From: m.config.ID}
 		msg, err := buddyPingMsg(p, s)
 		if err != nil {
 			// log err
@@ -267,7 +267,7 @@ func (m *Memberlist) TcpPing(node *nodeState, timeout time.Duration) chan bool {
 		}
 		ping := ping{
 			SeqNo:      m.pingMng.nextSeqNo(),
-			Node:       node.Node.ID,
+			ID:         node.Node.ID,
 			SourceIP:   localIp,
 			SourcePort: localPort,
 		}

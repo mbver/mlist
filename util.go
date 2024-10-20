@@ -6,10 +6,12 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 	"math/rand"
 	"net"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-msgpack/v2/codec"
@@ -191,4 +193,9 @@ func copyBytes(s []byte) []byte {
 	res := make([]byte, len(s))
 	copy(res, s)
 	return s
+}
+
+func minSuspicionTimeout(scale, n int, interval time.Duration) time.Duration {
+	nodeScale := math.Max(1.0, math.Log10(math.Max(1.0, float64(n))))
+	return time.Duration(scale) * interval * time.Duration(nodeScale*1000) / 1000
 }

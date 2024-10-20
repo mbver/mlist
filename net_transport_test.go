@@ -146,7 +146,7 @@ func TestNetTransport_SendReceiveUDP(t *testing.T) {
 	require.Nil(t, err)
 	udpAddr2 := net.UDPAddr{IP: addr2, Port: port2}
 
-	msg := ping{SeqNo: 42, Node: "Node1", SourceIP: addr1, SourcePort: uint16(port1)}
+	msg := ping{SeqNo: 42, ID: "Node1", SourceIP: addr1, SourcePort: uint16(port1)}
 	encoded, err := encode(pingMsg, msg)
 	require.Nil(t, err)
 
@@ -168,7 +168,7 @@ func TestNetTransport_SendReceiveUDP(t *testing.T) {
 	err = decode(received[1:], &decoded)
 	require.Nil(t, err)
 	require.Equal(t, decoded.SeqNo, msg.SeqNo)
-	require.Equal(t, decoded.Node, msg.Node)
+	require.Equal(t, decoded.ID, msg.ID)
 	if !bytes.Equal(decoded.SourceIP, addr1) {
 		t.Errorf("source addr not matched. expect %s, got %s", addr1, decoded.SourceIP)
 	}
@@ -212,7 +212,7 @@ func TestNetTransport_SendReceiveTCP(t *testing.T) {
 	conn1.SetDeadline(time.Now().Add(timeout))
 	conn2.SetDeadline(time.Now().Add(timeout))
 
-	msg := ping{SeqNo: 42, Node: "Node1"}
+	msg := ping{SeqNo: 42, ID: "Node1"}
 	encoded, err := encode(pingMsg, msg)
 	require.Nil(t, err)
 
@@ -229,7 +229,7 @@ func TestNetTransport_SendReceiveTCP(t *testing.T) {
 	err = dec.Decode(&decoded)
 	require.Nil(t, err)
 	require.Equal(t, decoded.SeqNo, msg.SeqNo)
-	require.Equal(t, decoded.Node, msg.Node)
+	require.Equal(t, decoded.ID, msg.ID)
 
 	res := ack{msg.SeqNo, []byte("abc")}
 	encoded, err = encode(ackMsg, res)

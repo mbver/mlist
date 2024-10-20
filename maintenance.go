@@ -114,7 +114,7 @@ WAIT:
 	missedNacks := indirectRes.numNode - indirectRes.nNacks
 	m.awr.Punish(missedNacks)
 	// m.logger.Printf("[INFO] memberlist: Suspect %s has failed, no acks received", node.Name)
-	s := suspect{Lives: node.Lives, Node: node.Node.ID, From: m.config.ID}
+	s := suspect{Lives: node.Lives, ID: node.Node.ID, From: m.config.ID}
 	m.suspectNode(&s)
 }
 

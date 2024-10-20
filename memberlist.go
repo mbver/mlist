@@ -7,6 +7,7 @@ import (
 )
 
 type Memberlist struct {
+	lives       uint32
 	awr         *awareness
 	config      *Config
 	keyring     *Keyring
@@ -14,6 +15,7 @@ type Memberlist struct {
 	shutdownL   sync.Mutex // guard shutdown, shutdownCh
 	shutdownCh  chan struct{}
 	shutdown    int32
+	left        int32
 	mbroadcasts *TransmitCapQueue
 	ubroadcasts UserBroadcasts
 	longRunMng  *longRunMsgManager
@@ -24,7 +26,7 @@ type Memberlist struct {
 	nodes       []*nodeState
 	nodeMap     map[string]*nodeState
 	numNodes    int32 // allow concurrent access
-	suspicions  map[string]suspicion
+	suspicions  map[string]*suspicion
 }
 
 type MemberlistBuilder struct{}
@@ -76,7 +78,7 @@ func (m *Memberlist) hasShutdown() bool {
 }
 
 func (m *Memberlist) hasLeft() bool {
-	return false
+	return atomic.LoadInt32(&m.left) == 1
 }
 
 // return a clone of node state
