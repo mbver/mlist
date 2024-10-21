@@ -10,6 +10,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -49,6 +50,10 @@ type NetTransport struct {
 func NewNetTransport(addrs []string, port int, logger *log.Logger) (*NetTransport, error) {
 	if len(addrs) == 0 {
 		return nil, fmt.Errorf("at least one bind address is required")
+	}
+
+	if logger == nil {
+		return nil, fmt.Errorf("logger is required")
 	}
 
 	return &NetTransport{
@@ -107,6 +112,24 @@ func (t *NetTransport) Start() error {
 	}
 	ok = true
 	return nil
+}
+
+func ZeroBindPortTransport(addrs []string, logger *log.Logger) (*NetTransport, error) {
+	t, err := NewNetTransport(addrs, 0, logger)
+	if err != nil {
+		return nil, err
+	}
+	for i := 0; i < 10; i++ {
+		err := t.Start()
+		if err == nil {
+			return t, nil
+		}
+		if strings.Contains(err.Error(), "address already in use") {
+			logger.Printf("[DEBUG] memberlist: Got bind error: %v", err)
+			continue
+		}
+	}
+	return nil, fmt.Errorf("failed to obtain address: %v", err)
 }
 
 func (t *NetTransport) Shutdown() {
@@ -229,6 +252,10 @@ func (t *NetTransport) getFirstConn() (*net.UDPConn, error) {
 		return nil, fmt.Errorf("transport shutdown")
 	}
 	return t.udpConns[0], nil
+}
+
+func (t *NetTransport) BindPort() int {
+	return t.bindPort
 }
 
 func (t *NetTransport) SendUdp(msg []byte, addr *net.UDPAddr) (time.Time, error) {

@@ -18,13 +18,19 @@ type EventManager struct {
 }
 
 func (mng *EventManager) NotifyJoin(n *Node) {
-	mng.ch <- &NodeEvent{NodeJoin, n}
+	if mng.ch != nil {
+		mng.ch <- &NodeEvent{NodeJoin, n}
+	}
 }
 
 func (mng *EventManager) NotifyLeave(n *Node) {
-	mng.ch <- &NodeEvent{NodeLeave, n}
+	if mng.ch != nil {
+		mng.ch <- &NodeEvent{NodeLeave, n}
+	}
 }
 
 func (mng *EventManager) NotifyUpdate(n *Node) {
-	mng.ch <- &NodeEvent{NodeUpdate, n}
+	if mng.ch != nil {
+		mng.ch <- &NodeEvent{NodeUpdate, n}
+	}
 }

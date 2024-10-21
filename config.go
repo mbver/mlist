@@ -1,6 +1,9 @@
 package memberlist
 
-import "time"
+import (
+	"net"
+	"time"
+)
 
 type Config struct {
 	ID                      string // use a unique id instead of name
@@ -8,20 +11,31 @@ type Config struct {
 	BindPort                int
 	AdvertiseAddr           string
 	AdvertisePort           int
-	TcpTimeout              time.Duration
-	PingTimeout             time.Duration
-	ProbeTimeout            time.Duration
+	CIDRsAllowed            []net.IPNet
 	Label                   string
+	UDPBufferSize           int // maximum size of a udp packet
+	DNSConfigPath           string
 	EnableCompression       bool
 	EncryptionVersion       encryptionVersion
-	UDPBufferSize           int // maximum size of a udp packet
-	MaxLongRunQueueDepth    int
-	MaxConcurentPushPull    int
+	TcpTimeout              time.Duration
 	NumIndirectChecks       int
-	RetransmitScale         int
+	PingTimeout             time.Duration
+	ProbeTimeout            time.Duration
+	ProbeInterval           time.Duration
+	GossipNodes             int
+	GossipInterval          time.Duration
+	DeadNodeExpiredTimeout  time.Duration
+	ReapInterval            time.Duration
+	ReconnectInterval       time.Duration
+	MaxPushPulls            int
+	PushPullInterval        time.Duration
 	MaxAwarenessHealth      int
 	SuspicionMult           int
 	SuspicionMaxTimeoutMult int
+	MaxLongRunQueueDepth    int
+	QueueCheckInterval      time.Duration
+	RetransmitMult          int
+	Tags                    []byte
 }
 
 func DefaultLANConfig(id string) *Config {
@@ -31,12 +45,12 @@ func DefaultLANConfig(id string) *Config {
 		BindPort:                7496,
 		TcpTimeout:              10 * time.Second,
 		PingTimeout:             500 * time.Millisecond,
-		ProbeTimeout:            1500 * time.Millisecond, // at least 3 times more than PingTimeout
+		ProbeInterval:           1500 * time.Millisecond, // at least 3 times more than PingTimeout
 		NumIndirectChecks:       3,
 		EnableCompression:       true,
 		EncryptionVersion:       0,
 		MaxLongRunQueueDepth:    1024,
-		RetransmitScale:         4,
+		RetransmitMult:          4,
 		MaxAwarenessHealth:      8,
 		SuspicionMult:           4,
 		SuspicionMaxTimeoutMult: 6,

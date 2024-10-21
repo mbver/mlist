@@ -27,6 +27,7 @@ func newTestPingMemberlist() (*Memberlist, func(), error) {
 	m.pingMng = newPingManager()
 
 	m.shutdownCh = make(chan struct{})
+	m.stopScheduleCh = make(chan struct{})
 
 	ip, port, err := m.GetAdvertiseAddr()
 	if err != nil {
@@ -67,7 +68,7 @@ func TestPing_DirectIndirectTcp(t *testing.T) {
 	require.Nil(t, err)
 
 	pingTimeout := m1.config.PingTimeout
-	probeTimeout := m1.config.ProbeTimeout
+	probeTimeout := m1.config.ProbeInterval
 
 	m2, cleanup2, err := newTestPingMemberlist()
 	defer func() {

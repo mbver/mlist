@@ -3,6 +3,7 @@ package memberlist
 import (
 	"bytes"
 	"net"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -127,5 +128,46 @@ func TestRandIntN(t *testing.T) {
 func TestRandIntN_Zero(t *testing.T) {
 	if randIntN(0) != 0 {
 		t.Fatalf("expect zero")
+	}
+}
+
+func TestShuffleNodes(t *testing.T) {
+	orig := []*nodeState{
+		{
+			State: StateDead,
+		},
+		{
+			State: StateAlive,
+		},
+		{
+			State: StateAlive,
+		},
+		{
+			State: StateDead,
+		},
+		{
+			State: StateAlive,
+		},
+		{
+			State: StateAlive,
+		},
+		{
+			State: StateDead,
+		},
+		{
+			State: StateAlive,
+		},
+	}
+	nodes := make([]*nodeState, len(orig))
+	copy(nodes[:], orig[:])
+
+	if !reflect.DeepEqual(nodes, orig) {
+		t.Fatalf("should match")
+	}
+
+	shuffleNodes(nodes)
+
+	if reflect.DeepEqual(nodes, orig) {
+		t.Fatalf("should not match")
 	}
 }

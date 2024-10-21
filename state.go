@@ -209,7 +209,7 @@ func (m *Memberlist) suspectNode(s *suspect) {
 		confirmCap = 1
 	}
 
-	minTimeout := minSuspicionTimeout(m.config.SuspicionMult, n, m.config.ProbeTimeout)
+	minTimeout := minSuspicionTimeout(m.config.SuspicionMult, n, m.config.ProbeInterval)
 	maxTimeout := time.Duration(m.config.SuspicionMaxTimeoutMult) * minTimeout
 	lives := s.Lives
 	timeoutFn := func(confirms int) {

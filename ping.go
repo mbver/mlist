@@ -24,10 +24,11 @@ type pingManager struct {
 	usrPing             PingDelegate
 }
 
-func newPingManager() *pingManager {
+func newPingManager(d PingDelegate) *pingManager {
 	return &pingManager{
 		ackHandlers:         make(map[uint32]*ackHandler),
 		indirectAckHandlers: make(map[uint32]*indirectAckHandler),
+		usrPing:             d,
 	}
 }
 

@@ -41,6 +41,20 @@ func decode(buf []byte, out interface{}) error {
 	return dec.Decode(out)
 }
 
+func splitToCompoundMsgs(msgs [][]byte) [][]byte {
+	const maxMsgs = 255
+	split := make([][]byte, 0, len(msgs)/maxMsgs+1)
+	for len(msgs) > maxMsgs {
+		split = append(split, packCompoundMsg(msgs[:maxMsgs]))
+		msgs = msgs[maxMsgs:]
+	}
+	if len(msgs) > 0 {
+		split = append(split, packCompoundMsg(msgs))
+	}
+
+	return split
+}
+
 // compoundMsg = type-len(msgs)-[]len(msg)-[]msg
 func packCompoundMsg(msgs [][]byte) []byte {
 	buf := bytes.NewBuffer(nil)
@@ -102,7 +116,12 @@ func randIntN(n int) int {
 	return int(rand.Uint32() % uint32(n))
 }
 
-func shuffleNodes(nodes []*nodeState) {}
+func shuffleNodes(nodes []*nodeState) {
+	n := len(nodes)
+	rand.Shuffle(n, func(i, j int) {
+		nodes[i], nodes[j] = nodes[j], nodes[i]
+	})
+}
 
 // compression
 type compressionType uint8

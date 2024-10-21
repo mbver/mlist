@@ -2,10 +2,24 @@ package memberlist
 
 import (
 	"io"
+	"math"
 	"net"
+	"time"
 
 	"github.com/hashicorp/go-msgpack/v2/codec"
 )
+
+const pushPullScaleThreshold = 32
+
+func pushPullScale(interval time.Duration, n int) time.Duration {
+	// Don't scale until we cross the threshold
+	if n <= pushPullScaleThreshold {
+		return interval
+	}
+
+	mult := math.Ceil(math.Log2(float64(n))-math.Log2(pushPullScaleThreshold)) + 1.0
+	return time.Duration(mult) * interval
+}
 
 func (m *Memberlist) pushPull() {}
 

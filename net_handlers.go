@@ -358,7 +358,7 @@ func (m *Memberlist) handlePushPull(connReader io.Reader, dec *codec.Decoder, co
 	nPP := atomic.AddUint32(&m.numPushPull, 1)
 	defer atomic.AddUint32(&m.numPushPull, ^uint32(0)) // decrease the counter
 	// Check if we have too many open push/pull requests
-	if nPP >= uint32(m.config.MaxConcurentPushPull) {
+	if nPP >= uint32(m.config.MaxPushPulls) {
 		// m.logger.Printf("[ERR] memberlist: Too many pending push/pull requests")
 		return
 	}

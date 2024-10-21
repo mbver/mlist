@@ -47,10 +47,10 @@ type TransmitCapQueue struct {
 	idSeq         uint64
 }
 
-func (m *Memberlist) NewBroadcastQueue() *TransmitCapQueue {
+func NewBroadcastQueue(numNodes func() int, transmitScale int) *TransmitCapQueue {
 	return &TransmitCapQueue{
-		NumNodes:      m.getNumNodes,
-		TransmitScale: m.config.RetransmitScale,
+		NumNodes:      numNodes,
+		TransmitScale: transmitScale,
 		queue:         *heap.NewHeap(),
 		exists:        map[string]*TransmitCapItem{},
 	}
