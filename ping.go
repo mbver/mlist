@@ -13,7 +13,7 @@ type ackHandler struct {
 
 type PingDelegate interface {
 	Payload() []byte
-	FinishPing(from *Node, rtt time.Duration, payload []byte)
+	Finish(from *Node, rtt time.Duration, payload []byte)
 }
 
 type pingManager struct {
@@ -188,7 +188,7 @@ func (m *Memberlist) Ping(node *nodeState, timeout time.Duration) bool {
 	case a := <-ackCh:
 		if m.pingMng.usrPing != nil {
 			rtt := a.timestamp.Sub(sent)
-			m.pingMng.usrPing.FinishPing(node.Node, rtt, a.payload)
+			m.pingMng.usrPing.Finish(node.Node, rtt, a.payload)
 		}
 		return true
 	case <-time.After(timeout):
