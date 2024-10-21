@@ -24,7 +24,7 @@ func newTestPingMemberlist() (*Memberlist, func(), error) {
 	m.transport = tr
 	m.finalizeAdvertiseAddr()
 
-	m.pingMng = newPingManager()
+	m.pingMng = newPingManager(nil)
 
 	m.shutdownCh = make(chan struct{})
 	m.stopScheduleCh = make(chan struct{})
