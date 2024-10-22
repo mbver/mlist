@@ -87,8 +87,8 @@ func (m *Memberlist) aliveNode(a *alive, notify chan struct{}) {
 	if m.hasLeft() && isLocalNode { // seems no need, because Lives in increased larger that alive
 		return
 	}
-	if err := m.IsIPAllowed(a.IP); err != nil {
-		// m.logger.Printf("[WARN] memberlist: Rejected node %s (%v): %s", a.ID, net.IP(a.Addr), errCon)
+	if !m.IPAllowed(a.IP) {
+		m.logger.Printf("[WARN] memberlist: Rejected node %s: %s", a.ID, a.IP)
 		return
 	}
 

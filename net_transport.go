@@ -531,12 +531,16 @@ func (m *Memberlist) GetAdvertiseAddr() (net.IP, uint16, error) {
 	return ip, uint16(m.config.AdvertisePort), nil
 }
 
-func (m *Memberlist) isAddrAllowed(a net.Addr) error {
-	return nil
-}
-
-func (m *Memberlist) IsIPAllowed(ip net.IP) error {
-	return nil
+func (m *Memberlist) IPAllowed(ip net.IP) bool {
+	if len(m.config.CIDRsAllowed) == 0 {
+		return true
+	}
+	for _, n := range m.config.CIDRsAllowed {
+		if n.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }
 
 func ParseCIDRs(v []string) ([]net.IPNet, error) {

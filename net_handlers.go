@@ -130,7 +130,7 @@ func (m *Memberlist) handlePing(buf []byte, from *net.UDPAddr) {
 	}
 }
 
-func (m *Memberlist) handleAck(buf []byte, from net.Addr, timestamp time.Time) {
+func (m *Memberlist) handleAck(buf []byte, from *net.UDPAddr, timestamp time.Time) {
 	var a ack
 	if err := decode(buf, &a); err != nil {
 		// m.logger.Printf("[ERR] memberlist: Failed to decode ack response: %s %s", err, LogAddress(from))
@@ -184,7 +184,7 @@ func (m *Memberlist) handleIndirectAck(msg []byte, from *net.UDPAddr) {
 type longRunMsg struct {
 	mType msgType
 	msg   []byte
-	from  net.Addr
+	from  *net.UDPAddr
 }
 
 // TODO: passing userMsg to a channel for user to handle?
@@ -209,7 +209,7 @@ func newLongRunMsgManager(qDepth int) *longRunMsgManager {
 	}
 }
 
-func (mng *longRunMsgManager) queueLongRunMsg(t msgType, msg []byte, from net.Addr) {
+func (mng *longRunMsgManager) queueLongRunMsg(t msgType, msg []byte, from *net.UDPAddr) {
 	queue := mng.lowPriorQueue
 	if t == aliveMsg { // alive msg is prioritized
 		queue = mng.highPriorQueue
@@ -256,13 +256,13 @@ func (m *Memberlist) runLongRunMsgHandler() {
 
 				switch msg.mType {
 				case suspectMsg:
-					// m.handleSuspect(msg.msg, msg.from)
+					m.handleSuspect(msg.msg, msg.from)
 				case aliveMsg:
-					// m.handleAlive(msg.msg, msg.from)
+					m.handleAlive(msg.msg, msg.from)
 				case deadMsg:
-					// m.handleDead(msg.msg, msg.from)
+					m.handleDead(msg.msg, msg.from)
 				case userMsg:
-					// m.handleUser(msg.msg, msg.from)
+					m.handleUser(msg.msg, msg.from)
 				default:
 					// m.logger.Printf("[ERR] memberlist: Message type (%d) not supported %s (packet handler)", msgType, LogAddress(from))
 				}
@@ -272,6 +272,31 @@ func (m *Memberlist) runLongRunMsgHandler() {
 		}
 	}
 }
+
+func (m *Memberlist) handleAlive(msg []byte, from *net.UDPAddr) {
+	if !m.IPAllowed(from.IP) {
+		m.logger.Printf("[DEBUG] memberlist: Blocked alive message: %s", LogAddress(from))
+		return
+	}
+	var a alive
+	if err := decode(msg, &a); err != nil {
+		m.logger.Printf("[ERR] memberlist: Failed to decode alive message: %s %s", err, LogAddress(from))
+		return
+	}
+	m.aliveNode(&a, nil)
+}
+
+func (m *Memberlist) handleSuspect(msg []byte, from *net.UDPAddr) {
+
+}
+
+func (m *Memberlist) handleUser(msg []byte, from *net.UDPAddr) {
+	if m.usrMsgCh != nil {
+		m.usrMsgCh <- msg
+	}
+}
+
+func (m *Memberlist) handleDead(msg []byte, from *net.UDPAddr) {}
 
 func (m *Memberlist) receiveTcpConn() {
 	for {

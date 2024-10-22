@@ -25,6 +25,7 @@ type Memberlist struct {
 	mbroadcasts    *TransmitCapQueue
 	ubroadcasts    UserBroadcasts
 	longRunMng     *longRunMsgManager
+	usrMsgCh       chan<- []byte
 	pingMng        *pingManager
 	eventMng       *EventManager
 	numPushPull    uint32
@@ -45,6 +46,7 @@ type MemberlistBuilder struct {
 	eventCh      chan<- *NodeEvent
 	pingDelegate PingDelegate
 	ubroadcasts  UserBroadcasts
+	usrMsgCh     chan<- []byte
 }
 
 func (b *MemberlistBuilder) WithConfig(c *Config) {
@@ -65,6 +67,10 @@ func (b *MemberlistBuilder) WithLogger(l *log.Logger) {
 
 func (b *MemberlistBuilder) WithEventCh(ch chan<- *NodeEvent) {
 	b.eventCh = ch
+}
+
+func (b *MemberlistBuilder) WithUserMessageCh(ch chan<- []byte) {
+	b.usrMsgCh = ch
 }
 
 func (b *MemberlistBuilder) WithUserBroadcasts(u UserBroadcasts) {
@@ -126,6 +132,7 @@ func (b *MemberlistBuilder) Build() (*Memberlist, error) {
 		logger:         b.logger,
 		shutdownCh:     make(chan struct{}),
 		ubroadcasts:    b.ubroadcasts,
+		usrMsgCh:       b.usrMsgCh,
 		longRunMng:     newLongRunMsgManager(b.config.MaxLongRunQueueDepth),
 		pingMng:        newPingManager(b.pingDelegate),
 		eventMng:       &EventManager{b.eventCh},
