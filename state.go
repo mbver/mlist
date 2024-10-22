@@ -287,5 +287,3 @@ func (m *Memberlist) deadNode(d *dead, notify chan struct{}) {
 		m.eventMng.NotifyLeave(node.Node.Clone())
 	}
 }
-
-type stateToMerge struct{}
