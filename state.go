@@ -101,9 +101,6 @@ func (m *Memberlist) aliveNode(a *alive, notify chan struct{}) {
 		if rebroadcast {
 			m.broadcast(newNode.ID, aliveMsg, a, notify)
 		}
-		if m.eventMng == nil {
-			return
-		}
 		if notifyJoin {
 			m.eventMng.NotifyJoin(newNode)
 		}

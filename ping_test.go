@@ -1,6 +1,8 @@
 package memberlist
 
 import (
+	"log"
+	"os"
 	"testing"
 	"time"
 
@@ -49,6 +51,8 @@ func newTestPingMemberlist() (*Memberlist, func(), error) {
 		id: node,
 	}
 	m.awr = newAwareness(8)
+	m.mbroadcasts = NewBroadcastQueue(m.getNumNodes, 4)
+	m.logger = log.New(os.Stderr, "", log.LstdFlags)
 	go m.receivePacket()
 	go m.receiveTcpConn()
 

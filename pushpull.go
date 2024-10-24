@@ -93,7 +93,7 @@ func (m *Memberlist) sendAndReceiveState(addr string) ([]stateToMerge, error) {
 	}
 	// Quit if not push/pull
 	if msgType != pushPullMsg {
-		err := fmt.Errorf("received invalid msgType (%d), expected pushPullMsg (%d) %s", msgType, pushPullMsg, LogConn(conn))
+		err := fmt.Errorf("received invalid msgType (%d), expected pushPullMsg (%d) from %s", msgType, pushPullMsg, conn.RemoteAddr())
 		return nil, err
 	}
 
