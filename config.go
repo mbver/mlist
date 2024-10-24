@@ -49,6 +49,7 @@ func DefaultLANConfig(id string) *Config {
 		NumIndirectChecks:       3,
 		EnableCompression:       true,
 		EncryptionVersion:       0,
+		DNSConfigPath:           "/etc/resolv.conf",
 		MaxLongRunQueueDepth:    1024,
 		RetransmitMult:          4,
 		MaxAwarenessHealth:      8,

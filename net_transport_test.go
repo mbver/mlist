@@ -2,6 +2,7 @@ package memberlist
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/hashicorp/go-msgpack/v2/codec"
 	"github.com/mbver/mlist/testaddr"
+	"github.com/miekg/dns"
 	"github.com/stretchr/testify/require"
 )
 
@@ -246,4 +248,217 @@ func TestNetTransport_SendReceiveTCP(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, decRes.SeqNo, res.SeqNo)
 	require.Equal(t, decRes.Payload, res.Payload)
+}
+
+func TestResolveAddr(t *testing.T) {
+	m := &Memberlist{
+		config: &Config{
+			DNSConfigPath: "/etc/resolv.conf",
+		},
+	}
+
+	cases := []struct {
+		name string
+		host string // the input address
+		err  bool
+		ips  []net.IP
+		port uint16
+	}{
+		{
+			name: "localhost",
+			host: "localhost",
+			port: 0,
+		},
+		{
+			name: "ipv6 pair",
+			host: "[::1]:80",
+			ips:  []net.IP{net.IPv6loopback},
+			port: 80,
+		},
+		{
+			name: "ipv6 non-pair",
+			host: "[::1]",
+			ips:  []net.IP{net.IPv6loopback},
+			port: 0,
+		},
+		{
+			name: "hostless port",
+			host: ":80",
+			err:  true,
+		},
+		{
+			name: "hostname port combo",
+			host: "localhost:80",
+			port: 80,
+		},
+		{
+			name: "too high port",
+			host: "localhost:80000",
+			err:  true,
+		},
+		{
+			name: "ipv4 port combo",
+			host: "127.0.0.1:80",
+			ips:  []net.IP{net.IPv4(127, 0, 0, 1)},
+			port: 80,
+		},
+		{
+			name: "ipv6 port combo",
+			host: "[2001:db8:a0b:12f0::1]:80",
+			ips:  []net.IP{{0x20, 0x01, 0x0d, 0xb8, 0x0a, 0x0b, 0x12, 0xf0, 0, 0, 0, 0, 0, 0, 0, 0x1}},
+			port: 80,
+		},
+		{
+			name: "ipv4 only",
+			host: "127.0.0.1",
+			ips:  []net.IP{net.IPv4(127, 0, 0, 1)},
+			port: 0,
+		},
+		{
+			name: "ipv6 only",
+			host: "[2001:db8:a0b:12f0::1]",
+			ips:  []net.IP{{0x20, 0x01, 0x0d, 0xb8, 0x0a, 0x0b, 0x12, 0xf0, 0, 0, 0, 0, 0, 0, 0, 0x1}},
+			port: 0,
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc // store the current variable as the we run test in parallel
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ips, port, err := resolveAddr(tc.host, m.config.DNSConfigPath)
+			if tc.err {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tc.port, port)
+				if tc.ips != nil {
+					require.Equal(t, tc.ips, ips)
+				}
+			}
+		})
+	}
+}
+
+type mockDNS struct {
+	t *testing.T
+}
+
+func (h mockDNS) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
+	if len(r.Question) != 1 {
+		h.t.Fatalf("bad: %#v", r.Question)
+	}
+
+	name := "join.service.consul."
+	question := r.Question[0]
+	// only accept query for "join.service.consul."
+	if question.Name != name || question.Qtype != dns.TypeANY {
+		h.t.Fatalf("bad: %#v", question)
+	}
+
+	m := new(dns.Msg)
+	m.SetReply(r)
+	m.Authoritative = true
+	m.RecursionAvailable = false
+	// set an ipv4 answer
+	m.Answer = append(m.Answer, &dns.A{
+		Hdr: dns.RR_Header{
+			Name:   name,
+			Rrtype: dns.TypeA,
+			Class:  dns.ClassINET},
+		A: net.ParseIP("127.0.0.1"),
+	})
+	// set an ipv6 answer
+	m.Answer = append(m.Answer, &dns.AAAA{
+		Hdr: dns.RR_Header{
+			Name:   name,
+			Rrtype: dns.TypeAAAA,
+			Class:  dns.ClassINET},
+		AAAA: net.ParseIP("2001:db8:a0b:12f0::1"),
+	})
+	if err := w.WriteMsg(m); err != nil {
+		h.t.Fatalf("err: %v", err)
+	}
+}
+
+func setupMockDNS(t *testing.T, bind string) (path string, cleanup func(), err error) {
+	errCh := make(chan error, 1)
+	startedCh := make(chan struct{})
+	notifyStarted := func() { close(startedCh) }
+	server := &dns.Server{
+		Addr:              bind,
+		Handler:           mockDNS{t},
+		Net:               "tcp",
+		NotifyStartedFunc: notifyStarted, // notify waiting wg when server started successfully
+	}
+	go func() {
+		if err := server.ListenAndServe(); err != nil {
+			errCh <- err
+		}
+	}()
+
+	select {
+	case <-startedCh:
+	case err = <-errCh:
+		return "", nil, err
+	case <-time.After(2 * time.Second):
+		return "", nil, fmt.Errorf("timeout waiting for dns server to start")
+	}
+
+	cleanup = func() {
+		server.Shutdown()
+		if path != "" {
+			os.Remove(path)
+		}
+	}
+
+	// create a fake resolv.conf
+	tmpFile, err := os.CreateTemp("", "")
+	if err != nil {
+		return "", cleanup, err
+	}
+
+	path = tmpFile.Name()
+
+	content := []byte(fmt.Sprintf("nameserver %s", bind))
+	if _, err := tmpFile.Write(content); err != nil {
+		return "", cleanup, err
+	}
+	if err := tmpFile.Close(); err != nil {
+		return "", cleanup, err
+	}
+	return path, cleanup, nil
+}
+func TestResolveAddr_TCP_First(t *testing.T) {
+	// setup fake name server
+	bind := "127.0.0.1:8600"
+	path, cleanup, err := setupMockDNS(t, bind)
+	if cleanup != nil {
+		defer cleanup()
+	}
+
+	require.Nil(t, err)
+
+	m := &Memberlist{
+		config: &Config{
+			DNSConfigPath: path,
+		},
+	}
+	hosts := []string{
+		"join.service.consul.",
+		"join.service.consul", // the . will be added
+	}
+
+	for _, host := range hosts {
+		ips, port, err := resolveAddr(host, m.config.DNSConfigPath)
+		if err != nil {
+			t.Fatalf("err: %v", err)
+		}
+		expectedIPs := []net.IP{
+			net.ParseIP("127.0.0.1").To4(),
+			net.ParseIP("2001:db8:a0b:12f0::1"),
+		}
+		require.Equal(t, expectedIPs, ips)
+		require.Equal(t, uint16(0), port)
+	}
 }

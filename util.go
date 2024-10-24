@@ -190,14 +190,6 @@ func decompressMsg(msg []byte) ([]byte, error) {
 	return c.decompress()
 }
 
-func hasPort(s string) bool {
-	return false
-}
-
-func ensurePort(s string, port int) string {
-	return ""
-}
-
 func joinHostPort(host string, port uint16) string {
 	return net.JoinHostPort(host, strconv.Itoa(int(port)))
 }

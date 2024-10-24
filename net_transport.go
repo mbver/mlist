@@ -10,12 +10,14 @@ import (
 	"io"
 	"log"
 	"net"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/hashicorp/go-msgpack/v2/codec"
 	"github.com/hashicorp/go-sockaddr"
+	"github.com/miekg/dns"
 )
 
 const (
@@ -547,8 +549,109 @@ func ParseCIDRs(v []string) ([]net.IPNet, error) {
 	return nil, nil
 }
 
-type ipPort struct{}
+func hasPort(s string) bool {
+	// IPv6 address in brackets.
+	if strings.LastIndex(s, "[") == 0 {
+		return strings.LastIndex(s, ":") > strings.LastIndex(s, "]")
+	}
 
-func (m *Memberlist) resolveAddr(hostStr string) ([]ipPort, error) {
-	return nil, nil
+	// Otherwise the presence of a single colon determines if there's a port
+	// since IPv6 addresses outside of brackets (count > 1) can't have a
+	// port.
+	return strings.Count(s, ":") == 1
+}
+
+func parsePort(s string) (string, uint16, error) {
+	host, sport, err := net.SplitHostPort(s)
+	if err != nil {
+		return "", 0, err
+	}
+	iport, err := strconv.ParseUint(sport, 10, 16)
+	if err != nil {
+		return "", 0, err
+	}
+	return host, uint16(iport), nil
+}
+
+func resolveAddr(hostStr string, dnsConfPath string) ([]net.IP, uint16, error) {
+	if !hasPort(hostStr) {
+		hostStr += ":0"
+	}
+	hostStr, port, err := parsePort(hostStr)
+	if err != nil {
+		return nil, 0, err
+	}
+	if ip := net.ParseIP(hostStr); ip != nil {
+		return []net.IP{ip}, port, nil
+	}
+
+	// prefer consul compatible dns lookup
+	ips, err := tcpLookupIP(hostStr, dnsConfPath)
+	if err != nil {
+		return nil, 0, err
+	}
+	// fallback to go resolver if rejected by tcpLookupIP
+	if len(ips) == 0 {
+		ips, err = net.LookupIP(hostStr)
+		if err != nil {
+			return nil, 0, err
+		}
+	}
+
+	return ips, port, err
+}
+
+// consul dns servers prefer a tcp lookup from beginning
+// while go resolver uses udp and only fallback to tcp if udp response is truncated
+// tcp lookup can obtain a larger list of ips to join
+func tcpLookupIP(host string, dnsConfPath string) ([]net.IP, error) {
+	// reject non-FQDN, use go reslover with resolv.conf
+	if !strings.Contains(host, ".") {
+		return nil, nil
+	}
+
+	// Make sure the domain name is terminated with a dot
+	if host[len(host)-1] != '.' {
+		host += "."
+	}
+
+	cc, err := dns.ClientConfigFromFile(dnsConfPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(cc.Servers) == 0 {
+		return nil, nil
+	}
+
+	// prepare message
+	msg := new(dns.Msg)
+	msg.SetQuestion(host, dns.TypeANY)
+
+	server := cc.Servers[0]
+	// make sure server has port
+	if !hasPort(server) {
+		server = net.JoinHostPort(server, cc.Port)
+	}
+	// prepare client that uses tcp
+	client := new(dns.Client)
+	client.Net = "tcp"
+
+	// talk to server
+	res, _, err := client.Exchange(msg, server)
+	if err != nil {
+		return nil, err
+	}
+
+	var ips []net.IP
+	// process dns response
+	for _, r := range res.Answer {
+		switch rr := r.(type) {
+		case (*dns.A): // ipv4 record
+			ips = append(ips, rr.A)
+		case (*dns.AAAA): // ipv6 record
+			ips = append(ips, rr.AAAA)
+		}
+	}
+	return ips, nil
 }
