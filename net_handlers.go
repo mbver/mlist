@@ -159,9 +159,8 @@ func (m *Memberlist) handleIndirectPing(msg []byte, from *net.UDPAddr) {
 		},
 		State: StateAlive,
 	}
-	pingTimeout := m.awr.ScaleTimeout(m.config.PingTimeout)
 	go func() {
-		ok := m.Ping(node, pingTimeout)
+		ok := m.Ping(node, m.config.PingTimeout) // don't scale timeout for indirect ping
 		indAck := indirectAck{ind.SeqNo, true}
 		if !ok {
 			indAck.Success = false

@@ -546,7 +546,21 @@ func (m *Memberlist) IPAllowed(ip net.IP) bool {
 }
 
 func ParseCIDRs(v []string) ([]net.IPNet, error) {
-	return nil, nil
+	nets := make([]net.IPNet, 0)
+	if len(v) == 0 {
+		return nets, nil
+	}
+	var errs []error
+	for _, p := range v {
+		_, net, err := net.ParseCIDR(strings.TrimSpace(p))
+		if err != nil {
+			errs = append(errs, fmt.Errorf("invalid cidr: %s: %w", p, err))
+			continue
+		}
+		nets = append(nets, *net)
+	}
+
+	return nets, combineErrors(errs)
 }
 
 func hasPort(s string) bool {

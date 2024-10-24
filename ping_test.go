@@ -14,7 +14,8 @@ func newTestPingMemberlist() (*Memberlist, func(), error) {
 	}
 
 	id := UniqueID()
-	m.config = DefaultLANConfig(id) // change config
+	m.config = DefaultLANConfig() // change config
+	m.config.ID = id
 	m.config.Label = "label"
 	tr, cleanup, err := newTestTransport()
 	if err != nil {

@@ -60,17 +60,9 @@ func (m *Memberlist) scheduleFuncWithScale(interval time.Duration, stopCh chan s
 func (m *Memberlist) gossip() {
 	// Get some random live, suspect, or unexpired nodes
 	nodes := m.pickRandomNodes(m.config.GossipNodes, func(n *nodeState) bool {
-		if n.Node.ID == m.config.ID {
-			return false
-		}
-		switch n.State {
-		case StateAlive, StateSuspect:
-			return true
-		case StateDead:
-			return time.Since(n.StateChange) <= m.config.DeadNodeExpiredTimeout
-		default:
-			return false
-		}
+		return n.Node.ID != m.config.ID &&
+			(n.State != StateDead ||
+				(n.State == StateDead && time.Since(n.StateChange) <= m.config.DeadNodeExpiredTimeout))
 	})
 
 	// Compute the bytes available

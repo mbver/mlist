@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/lzw"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -233,4 +234,17 @@ func LogConn(conn net.Conn) string {
 	}
 
 	return LogAddress(conn.RemoteAddr())
+}
+
+func combineErrors(errs []error) error {
+	if len(errs) == 0 {
+		return nil
+	}
+	sb := &strings.Builder{}
+	for _, e := range errs {
+		sb.WriteString(e.Error())
+		sb.WriteString(";")
+	}
+	errMsg := strings.TrimSuffix(sb.String(), ";")
+	return errors.New(errMsg)
 }

@@ -26,7 +26,6 @@ type Config struct {
 	GossipInterval          time.Duration
 	DeadNodeExpiredTimeout  time.Duration
 	ReapInterval            time.Duration
-	ReconnectInterval       time.Duration
 	MaxPushPulls            int
 	PushPullInterval        time.Duration
 	MaxAwarenessHealth      int
@@ -38,22 +37,32 @@ type Config struct {
 	Tags                    []byte
 }
 
-func DefaultLANConfig(id string) *Config {
+func DefaultLANConfig() *Config {
 	return &Config{
-		ID:                      id,
+		ID:                      "",
 		BindAddr:                "0.0.0.0",
-		BindPort:                7496,
-		TcpTimeout:              10 * time.Second,
-		PingTimeout:             500 * time.Millisecond,
-		ProbeInterval:           1500 * time.Millisecond, // at least 3 times more than PingTimeout
-		NumIndirectChecks:       3,
+		BindPort:                7946,
+		AdvertiseAddr:           "",
+		AdvertisePort:           7946,
+		UDPBufferSize:           1400,
+		DNSConfigPath:           "/etc/resolv.conf",
 		EnableCompression:       true,
 		EncryptionVersion:       0,
-		DNSConfigPath:           "/etc/resolv.conf",
-		MaxLongRunQueueDepth:    1024,
-		RetransmitMult:          4,
+		TcpTimeout:              10 * time.Second,
+		NumIndirectChecks:       3,
+		PingTimeout:             500 * time.Millisecond,
+		ProbeInterval:           1100 * time.Millisecond, // more than 2 times of PingTimeout so IndirectPing can get Nacks
+		GossipNodes:             3,
+		GossipInterval:          200 * time.Millisecond,
+		DeadNodeExpiredTimeout:  30 * time.Second,
+		ReapInterval:            3 * time.Second,
+		MaxPushPulls:            128,
+		PushPullInterval:        30 * time.Second,
 		MaxAwarenessHealth:      8,
 		SuspicionMult:           4,
 		SuspicionMaxTimeoutMult: 6,
+		MaxLongRunQueueDepth:    1024,
+		QueueCheckInterval:      30 * time.Second,
+		RetransmitMult:          4,
 	}
 }
