@@ -116,7 +116,19 @@ func (m *Memberlist) sendLocalState(conn net.Conn, streamLabel string) error {
 }
 
 func (m *Memberlist) localState() []stateToMerge {
-	return nil
+	// Prepare the local node state
+	m.nodeL.RLock()
+	defer m.nodeL.RUnlock()
+	res := make([]stateToMerge, len(m.nodes))
+	for i, n := range m.nodes {
+		res[i].Lives = n.Lives
+		res[i].ID = n.Node.ID
+		res[i].IP = n.Node.IP
+		res[i].Port = n.Node.Port
+		res[i].State = n.State
+		res[i].Tags = n.Node.Tags
+	}
+	return res
 }
 
 func encodePushPullMsg(localNodes []stateToMerge) ([]byte, error) {

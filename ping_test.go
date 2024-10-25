@@ -8,26 +8,12 @@ import (
 )
 
 func TestPing(t *testing.T) {
-	m1, cleanup1, err := newTestMemberlist()
-	if cleanup1 != nil {
-		defer cleanup1()
-	}
+	m1, m2, m3, cleanup, err := threeTestNodes()
+	defer cleanup()
 	require.Nil(t, err)
 
 	pingTimeout := m1.config.PingTimeout
 	probeTimeout := m1.config.ProbeInterval
-
-	m2, cleanup2, err := newTestMemberlist()
-	if cleanup2 != nil {
-		defer cleanup2()
-	}
-	require.Nil(t, err)
-
-	m3, cleanup3, err := newTestMemberlist()
-	if cleanup3 != nil {
-		defer cleanup3()
-	}
-	require.Nil(t, err)
 
 	node2 := m2.LocalNodeState()
 	if !m1.Ping(node2, pingTimeout) {

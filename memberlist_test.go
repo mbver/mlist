@@ -36,11 +36,63 @@ func newTestMemberlist() (*Memberlist, func(), error) {
 	}
 	return m, cleanup1, nil
 }
+
+func getCleanup(cleanups ...func()) func() {
+	return func() {
+		for _, f := range cleanups {
+			if f != nil {
+				f()
+			}
+		}
+	}
+}
+
+func twoTestNodes() (*Memberlist, *Memberlist, func(), error) {
+	m1, cleanup1, err := newTestMemberlist()
+	if err != nil {
+		return nil, nil, getCleanup(cleanup1), err
+	}
+	m2, cleanup2, err := newTestMemberlist()
+	cleanup := getCleanup(cleanup1, cleanup2)
+	if err != nil {
+		return nil, nil, cleanup, err
+	}
+	return m1, m2, cleanup, nil
+}
+
+func threeTestNodes() (*Memberlist, *Memberlist, *Memberlist, func(), error) {
+	m1, cleanup1, err := newTestMemberlist()
+	if err != nil {
+		return nil, nil, nil, getCleanup(cleanup1), err
+	}
+	m2, cleanup2, err := newTestMemberlist()
+	if err != nil {
+		return nil, nil, nil, getCleanup(cleanup1, cleanup2), err
+	}
+	m3, cleanup3, err := newTestMemberlist()
+	cleanup := getCleanup(cleanup1, cleanup2, cleanup3)
+	if err != nil {
+		return nil, nil, nil, cleanup, err
+	}
+	return m1, m2, m3, cleanup, nil
+}
+
 func TestMemberlist_Create(t *testing.T) {
 	_, cleanup, err := newTestMemberlist()
 	if cleanup != nil {
 		defer cleanup()
 	}
 	require.Nil(t, err)
+}
 
+func TestMemberlist_Join(t *testing.T) {
+	m1, m2, cleanup, err := twoTestNodes()
+	defer cleanup()
+	require.Nil(t, err)
+	addr := m2.LocalNodeState().Node.UDPAddress().String()
+	nsuccess, err := m1.Join([]string{addr})
+	require.Nil(t, err)
+	require.Equal(t, nsuccess, 1)
+	require.Equal(t, m1.NumActive(), 2)
+	require.Equal(t, m2.NumActive(), 2)
 }

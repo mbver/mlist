@@ -7,7 +7,6 @@ import (
 	"github.com/mbver/heap"
 )
 
-// call it broadcast or broadcastItem?
 type TransmitCapItem struct {
 	name      string
 	id        uint64

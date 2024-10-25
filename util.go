@@ -106,10 +106,6 @@ func unpackCompoundMsg(msg []byte) (trunc int, msgs [][]byte, err error) {
 	return
 }
 
-func makeCompoundMsgs(msgs [][]byte) []*bytes.Buffer {
-	return nil
-}
-
 func randIntN(n int) int {
 	if n == 0 { // if n == 0, modulo will panic
 		return 0

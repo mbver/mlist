@@ -65,6 +65,7 @@ func (t msgType) String() string {
 	}
 	return "unknown"
 }
+
 func (m *Memberlist) receivePacket() {
 	for {
 		select {
