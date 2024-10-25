@@ -32,6 +32,39 @@ const (
 	errMsg
 )
 
+func (t msgType) String() string {
+	switch t {
+	case pingMsg:
+		return "ping"
+	case indirectPingMsg:
+		return "indirect ping"
+	case ackMsg:
+		return "ack"
+	case indirectAckMsg:
+		return "indirectAck"
+	case aliveMsg:
+		return "alive"
+	case suspectMsg:
+		return "suspect"
+	case deadMsg:
+		return "dead"
+	case pushPullMsg:
+		return "pushpull"
+	case compoundMsg:
+		return "compound"
+	case userMsg:
+		return "user"
+	case compressMsg:
+		return "compress"
+	case encryptMsg:
+		return "encrypt"
+	case hasCrcMsg:
+		return "hasCrc"
+	case errMsg:
+		return "err"
+	}
+	return "unknown"
+}
 func (m *Memberlist) receivePacket() {
 	for {
 		select {

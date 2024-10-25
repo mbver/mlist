@@ -128,7 +128,7 @@ func (m *Memberlist) aliveNode(a *alive, notify chan struct{}) {
 		// Add to node list
 		m.nodeMap[a.ID] = node
 		m.nodes = append(m.nodes, node)
-		n := len(m.nodes)
+		n := len(m.nodes) - 1
 		idx := randIntN(n)
 		m.nodes[idx], m.nodes[n] = m.nodes[n], m.nodes[idx]
 		atomic.AddInt32(&m.numNodes, 1)

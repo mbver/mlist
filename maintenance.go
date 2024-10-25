@@ -130,7 +130,7 @@ func (m *Memberlist) probe() {
 
 func (m *Memberlist) nextProbeNode() (*nodeState, error) {
 	m.nodeL.RLock()
-	defer m.nodeL.Unlock()
+	defer m.nodeL.RUnlock()
 	m.probeIdx++
 	if m.probeIdx >= len(m.nodes) {
 		m.probeIdx = 0
