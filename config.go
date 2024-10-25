@@ -25,6 +25,7 @@ type Config struct {
 	GossipNodes             int
 	GossipInterval          time.Duration
 	DeadNodeExpiredTimeout  time.Duration
+	BroadcastWaitTimeout    time.Duration
 	ReapInterval            time.Duration
 	MaxPushPulls            int
 	PushPullInterval        time.Duration
@@ -55,6 +56,7 @@ func DefaultLANConfig() *Config {
 		GossipNodes:             3,
 		GossipInterval:          200 * time.Millisecond,
 		DeadNodeExpiredTimeout:  30 * time.Second,
+		BroadcastWaitTimeout:    3 * time.Second,
 		ReapInterval:            3 * time.Second,
 		MaxPushPulls:            128,
 		PushPullInterval:        30 * time.Second,

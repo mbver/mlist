@@ -76,6 +76,7 @@ type suspect struct {
 type dead struct {
 	Lives uint32
 	ID    string
+	Left  bool
 }
 
 func (m *Memberlist) nextLiveNo() uint32 {
@@ -84,7 +85,7 @@ func (m *Memberlist) nextLiveNo() uint32 {
 
 func (m *Memberlist) aliveNode(a *alive, notify chan struct{}) {
 	isLocalNode := a.ID == m.config.ID
-	if m.hasLeft() && isLocalNode { // seems no need, because Lives in increased larger that alive
+	if m.hasLeft() && isLocalNode {
 		return
 	}
 	if !m.IPAllowed(a.IP) {
@@ -264,7 +265,7 @@ func (m *Memberlist) deadNode(d *dead, notify chan struct{}) {
 	// if this is us & still active, refute
 	if isLocalNode && !m.hasLeft() {
 		m.refute(node, d.Lives)
-		// m.logger.Printf("[WARN] memberlist: Refuting a dead message (from: %s)", d.From)
+		m.logger.Printf("[WARN] memberlist: Refuting a dead message")
 		return
 	}
 
@@ -276,7 +277,7 @@ func (m *Memberlist) deadNode(d *dead, notify chan struct{}) {
 	// Update the state
 	node.Lives = d.Lives
 	node.State = StateDead
-	if isLocalNode {
+	if d.Left {
 		node.State = StateLeft
 	}
 	node.StateChange = time.Now()

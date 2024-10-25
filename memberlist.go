@@ -21,6 +21,7 @@ type Memberlist struct {
 	shutdownL      sync.Mutex // guard shutdown, shutdownCh
 	shutdownCh     chan struct{}
 	shutdown       bool
+	leaveL         sync.Mutex
 	left           int32
 	mbroadcasts    *TransmitCapQueue
 	ubroadcasts    UserBroadcasts
@@ -210,28 +211,116 @@ func (m *Memberlist) setAlive() error {
 }
 
 func (m *Memberlist) Join(existing []string) (int, error) {
-	return 0, nil
+	numSuccess := 0
+	var errs []error
+	for _, exist := range existing {
+		addrs, port, err := resolveAddr(exist, m.config.DNSConfigPath)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to resolve %s: %v", exist, err))
+			m.logger.Printf("[WARN] memberlist: %v", err)
+			continue
+		}
+		if port == 0 {
+			port = uint16(m.config.BindPort)
+		}
+		for _, addr := range addrs {
+			nodeAddr := joinHostPort(addr.String(), port)
+			if err := m.pushPullWithNode(nodeAddr); err != nil {
+				errs = append(errs, fmt.Errorf("failed to join %s: %v", addr, err))
+				m.logger.Printf("[DEBUG] memberlist: %v", err)
+				continue
+			}
+			numSuccess++
+		}
+	}
+	if numSuccess > 0 {
+		errs = nil
+	}
+	return numSuccess, combineErrors(errs)
 }
 
 func (m *Memberlist) Leave(timeout time.Duration) error {
+	m.leaveL.Lock()
+	defer m.leaveL.Unlock()
+
+	if m.hasShutdown() {
+		panic("leave after shutdown")
+	}
+
+	if m.hasLeft() {
+		return nil
+	}
+
+	atomic.StoreInt32(&m.left, 1)
+
+	m.nodeL.Lock()
+	node, ok := m.nodeMap[m.config.ID]
+	m.nodeL.Unlock()
+	if !ok {
+		m.logger.Printf("[WARN] memberlist: Leave but we're not in the node map.")
+		return nil
+	}
+	d := dead{
+		Lives: node.Lives,
+		ID:    node.Node.ID,
+		Left:  true,
+	}
+	notifyCh := make(chan struct{})
+	m.deadNode(&d, notifyCh)
+	if m.NumActive() == 0 || m.config.BroadcastWaitTimeout == 0 {
+		return nil
+	}
+	// Block until the broadcast goes out
+	select {
+	case <-notifyCh:
+	case <-time.After(m.config.BroadcastWaitTimeout):
+		return fmt.Errorf("timeout waiting for leave broadcast")
+	}
 	return nil
 }
 
-func (m *Memberlist) UpdateNode(timeout time.Duration) error {
+func (m *Memberlist) UpdateNode(tags []byte) error {
+	// Get the existing node
+	m.nodeL.RLock()
+	node := m.nodeMap[m.config.ID]
+	m.nodeL.RUnlock()
+
+	a := alive{
+		Lives: m.nextLiveNo(),
+		ID:    m.config.ID,
+		IP:    node.Node.IP,
+		Port:  node.Node.Port,
+		Tags:  tags,
+	}
+	notifyCh := make(chan struct{})
+	m.aliveNode(&a, notifyCh)
+
+	if m.NumActive() == 0 || m.config.BroadcastWaitTimeout == 0 {
+		return nil
+	}
+	// Wait for the broadcast or a timeout
+	select {
+	case <-notifyCh:
+	case <-time.After(m.config.BroadcastWaitTimeout):
+		return fmt.Errorf("timeout waiting for update broadcast")
+	}
 	return nil
 }
 
 func (m *Memberlist) NumActive() int {
-	return 0
+	m.nodeL.RLock()
+	defer m.nodeL.RUnlock()
+	active := 0
+	for _, n := range m.nodes {
+		if !n.DeadOrLeft() {
+			active++
+		}
+	}
+	return active
 }
 
 func (m *Memberlist) getNumNodes() int {
 	return int(atomic.LoadInt32(&m.numNodes))
-}
-
-// consider dropping
-func (m *Memberlist) hasActivePeers() bool {
-	return false
 }
 
 func (m *Memberlist) Shutdown() {
