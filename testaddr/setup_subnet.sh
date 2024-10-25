@@ -38,7 +38,7 @@ for ((i=10;i<256;i++))
 # Not use much, only need a few
 for j in 1 2
 do
-  for ((i=10;i<15;i++))
+  for ((i=10;i<12;i++))
   do
       if [ "$action" = "up" ]
       then

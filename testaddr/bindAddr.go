@@ -68,6 +68,9 @@ func (a *AddressList) NextAvailAddr() (ip net.IP, cleanUpFn func()) {
 	attempts := 0
 	for {
 		attempts++
+		if attempts == 20 {
+			panic("no available address")
+		}
 		ip = a.NextAddr()
 
 		addr := &net.TCPAddr{IP: ip, Port: testPort}
