@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/hashicorp/go-msgpack/v2/codec"
@@ -46,7 +47,7 @@ type NetTransport struct {
 	tcpListeners []*net.TCPListener
 	wg           sync.WaitGroup // to synchronize closing listeners when shutdown
 	l            sync.Mutex
-	shutdown     bool
+	shutdown     int32
 }
 
 func NewNetTransport(addrs []string, port int, logger *log.Logger) (*NetTransport, error) {
@@ -135,8 +136,11 @@ func ZeroBindPortTransport(addrs []string, logger *log.Logger) (*NetTransport, e
 }
 
 func (t *NetTransport) Shutdown() {
+	if t.hasShutdown() {
+		return
+	}
+	atomic.StoreInt32(&t.shutdown, 1)
 	t.l.Lock()
-	t.shutdown = true
 	// Rip through all the connections and shut them down.
 	for _, ln := range t.tcpListeners {
 		ln.Close()
@@ -153,9 +157,7 @@ func (t *NetTransport) Shutdown() {
 }
 
 func (t *NetTransport) hasShutdown() bool {
-	t.l.Lock()
-	defer t.l.Unlock()
-	return t.shutdown
+	return atomic.LoadInt32(&t.shutdown) == 1
 }
 
 // try to set udp socket buffer size to its largest value
@@ -202,7 +204,11 @@ func (t *NetTransport) tcpListen(l *net.TCPListener) {
 		// No error, reset loop delay
 		loopDelay = 0
 
-		t.tcpConnCh <- conn
+		select {
+		case t.tcpConnCh <- conn:
+		default:
+			t.logger.Printf("[DEBUG] transport: drop tcp conn")
+		}
 	}
 }
 
@@ -220,7 +226,7 @@ func (t *NetTransport) udpListen(c *net.UDPConn) {
 			if t.hasShutdown() {
 				break
 			}
-			t.logger.Printf("[ERR] memberlist: Error reading UDP packet: %v", err)
+			t.logger.Printf("[ERR] transport: Error reading UDP packet: %v", err)
 			if errors.Is(err, net.ErrClosed) {
 				break
 			}
@@ -230,16 +236,20 @@ func (t *NetTransport) udpListen(c *net.UDPConn) {
 
 		// msg must have at least 1 byte
 		if n < 1 {
-			t.logger.Printf("[ERR] memberlist: UDP packet too short (%d bytes) from %s", len(buf), addr)
+			t.logger.Printf("[ERR] transport: UDP packet too short (%d bytes) from %s", len(buf), addr)
 			continue
 		}
-
-		// Ingest the packet.
-		t.packetCh <- &Packet{
+		packet := &Packet{
 			Buf:       buf[:n],
 			From:      udpAddr,
 			Timestamp: ts,
 		}
+		select {
+		case t.packetCh <- packet:
+		default:
+			t.logger.Printf("[DEBUG] transport: drop udp packet")
+		}
+
 	}
 }
 
@@ -250,7 +260,7 @@ func (t *NetTransport) PacketCh() <-chan *Packet {
 func (t *NetTransport) getFirstConn() (*net.UDPConn, error) {
 	t.l.Lock()
 	defer t.l.Unlock()
-	if t.shutdown {
+	if len(t.udpConns) == 0 {
 		return nil, fmt.Errorf("transport shutdown")
 	}
 	return t.udpConns[0], nil

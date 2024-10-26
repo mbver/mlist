@@ -1,6 +1,7 @@
 package memberlist
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"net"
@@ -20,6 +21,7 @@ func defaultTestConfig() *Config {
 	conf.PingTimeout = 20 * time.Millisecond
 	conf.ProbeInterval = 50 * time.Millisecond
 	conf.GossipInterval = 20 * time.Millisecond
+	conf.BroadcastWaitTimeout = 100 * time.Millisecond
 	conf.RetransmitMult = 2
 	conf.SuspicionMaxTimeoutMult = 1
 	return conf
@@ -333,5 +335,38 @@ func TestMemberlist_Leave(t *testing.T) {
 	})
 	if !success {
 		t.Fatalf("leave unsuccessfully")
+	}
+}
+
+func TestMemberlist_UpdateTags(t *testing.T) {
+	m1, m2, cleanup, err := twoTestNodes()
+	defer cleanup()
+	require.Nil(t, err)
+	joinAndTest(t, m1, m2)
+	role1 := []byte("api")
+	m1.UpdateTags(role1)
+	role2 := []byte("db")
+	m2.UpdateTags(role2)
+	time.Sleep(2 * time.Second)
+	success := waitForCond(func() bool {
+		if m1.NumActive() != 2 || m2.NumActive() != 2 {
+			return false
+		}
+		if !bytes.Equal(m1.GetNodeState(m1.config.ID).Node.Tags, role1) {
+			return false
+		}
+		if !bytes.Equal(m1.GetNodeState(m2.config.ID).Node.Tags, role2) {
+			return false
+		}
+		if !bytes.Equal(m2.GetNodeState(m1.config.ID).Node.Tags, role1) {
+			return false
+		}
+		if !bytes.Equal(m2.GetNodeState(m2.config.ID).Node.Tags, role2) {
+			return false
+		}
+		return true
+	})
+	if !success {
+		t.Fatalf("update tags failed")
 	}
 }

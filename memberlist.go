@@ -278,7 +278,7 @@ func (m *Memberlist) Leave() error {
 	return nil
 }
 
-func (m *Memberlist) UpdateNode(tags []byte) error {
+func (m *Memberlist) UpdateTags(tags []byte) error {
 	// Get the existing node
 	m.nodeL.RLock()
 	node := m.nodeMap[m.config.ID]
@@ -341,9 +341,9 @@ func (m *Memberlist) Shutdown() {
 	if m.shutdown {
 		return
 	}
-	close(m.shutdownCh)
 	m.shutdown = true
 	m.transport.Shutdown()
+	close(m.shutdownCh) // close after transport shutdown so PacketCh is not blocked.
 }
 
 func (m *Memberlist) hasShutdown() bool {
