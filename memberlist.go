@@ -238,7 +238,7 @@ func (m *Memberlist) Join(existing []string) (int, error) {
 	return numSuccess, combineErrors(errs)
 }
 
-func (m *Memberlist) Leave(timeout time.Duration) error {
+func (m *Memberlist) Leave() error {
 	m.leaveL.Lock()
 	defer m.leaveL.Unlock()
 

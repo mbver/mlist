@@ -19,6 +19,7 @@ func defaultTestConfig() *Config {
 	conf.TcpTimeout = 50 * time.Millisecond
 	conf.PingTimeout = 20 * time.Millisecond
 	conf.ProbeInterval = 50 * time.Millisecond
+	conf.GossipInterval = 20 * time.Millisecond
 	conf.RetransmitMult = 2
 	conf.SuspicionMaxTimeoutMult = 1
 	return conf
@@ -81,16 +82,12 @@ func twoTestNodes() (*Memberlist, *Memberlist, func(), error) {
 }
 
 func threeTestNodes() (*Memberlist, *Memberlist, *Memberlist, func(), error) {
-	m1, cleanup1, err := newTestMemberlist(nil, 0)
+	m1, m2, cleanup1, err := twoTestNodes()
 	if err != nil {
-		return nil, nil, nil, getCleanup(cleanup1), err
-	}
-	m2, cleanup2, err := newTestMemberlist(nil, 0)
-	if err != nil {
-		return nil, nil, nil, getCleanup(cleanup1, cleanup2), err
+		return nil, nil, nil, cleanup1, err
 	}
 	m3, cleanup3, err := newTestMemberlist(nil, 0)
-	cleanup := getCleanup(cleanup1, cleanup2, cleanup3)
+	cleanup := getCleanup(cleanup1, cleanup3)
 	if err != nil {
 		return nil, nil, nil, cleanup, err
 	}
@@ -144,15 +141,19 @@ func testJoinState(t *testing.T, mlists ...*Memberlist) {
 		}
 	}
 }
-func TestMemberlist_Join(t *testing.T) {
-	m1, m2, cleanup, err := twoTestNodes()
-	defer cleanup()
-	require.Nil(t, err)
+
+func joinAndTest(t *testing.T, m1, m2 *Memberlist) {
 	addr := m2.LocalNodeState().Node.UDPAddress().String()
 	nsuccess, err := m1.Join([]string{addr})
 	require.Nil(t, err)
 	require.Equal(t, nsuccess, 1)
 	testJoinState(t, m1, m2)
+}
+func TestMemberlist_Join(t *testing.T) {
+	m1, m2, cleanup, err := twoTestNodes()
+	defer cleanup()
+	require.Nil(t, err)
+	joinAndTest(t, m1, m2)
 }
 
 func TestMemberlist_JoinSingleNetMask(t *testing.T) {
@@ -163,11 +164,7 @@ func TestMemberlist_JoinSingleNetMask(t *testing.T) {
 	require.Nil(t, err)
 	m2.config.CIDRsAllowed, err = ParseCIDRs([]string{"127.0.0.0/8"})
 	require.Nil(t, err)
-	addr := m2.LocalNodeState().Node.UDPAddress().String()
-	nsuccess, err := m1.Join([]string{addr})
-	require.Nil(t, err)
-	require.Equal(t, nsuccess, 1)
-	testJoinState(t, m1, m2)
+	joinAndTest(t, m1, m2)
 }
 
 func TestMemberlist_JoinMultiNetMasks(t *testing.T) {
@@ -300,19 +297,11 @@ func waitForCond(check func() bool) bool {
 }
 
 func TestMemberlist_JoinShutdown(t *testing.T) {
-	m1, cleanup1, err := newTestMemberlist(nil, 0)
+	m1, m2, cleanup, err := twoTestNodes()
+	defer cleanup()
 	require.Nil(t, err)
-	defer cleanup1()
+	joinAndTest(t, m1, m2)
 
-	m2, cleanup2, err := newTestMemberlist(nil, 0)
-	require.Nil(t, err)
-	defer cleanup2()
-
-	addr2 := m2.LocalNodeState().Node.UDPAddress().String()
-	n, err := m1.Join([]string{addr2})
-	require.Nil(t, err)
-	require.Equal(t, n, 1)
-	testJoinState(t, m1, m2)
 	m1.Shutdown()
 	if !waitForCond(func() bool {
 		return m2.NumActive() == 1
@@ -321,4 +310,28 @@ func TestMemberlist_JoinShutdown(t *testing.T) {
 	}
 }
 
-func TestMemberlist_Leave(t *testing.T) {}
+func TestMemberlist_Leave(t *testing.T) {
+	m1, m2, cleanup, err := twoTestNodes()
+	defer cleanup()
+	require.Nil(t, err)
+	joinAndTest(t, m1, m2)
+
+	err = m2.Leave()
+	require.Nil(t, err)
+
+	success := waitForCond(func() bool {
+		if m1.NumActive() != 1 || m2.NumActive() != 1 {
+			return false
+		}
+		if m1.GetNodeState(m2.config.ID).State != StateLeft {
+			return false
+		}
+		if m2.GetNodeState(m2.config.ID).State != StateLeft {
+			return false
+		}
+		return true
+	})
+	if !success {
+		t.Fatalf("leave unsuccessfully")
+	}
+}
