@@ -8,10 +8,21 @@ import (
 	"reflect"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/mbver/mlist/testaddr"
 	"github.com/stretchr/testify/require"
 )
+
+func defaultTestConfig() *Config {
+	conf := DefaultLANConfig()
+	conf.TcpTimeout = 50 * time.Millisecond
+	conf.PingTimeout = 20 * time.Millisecond
+	conf.ProbeInterval = 50 * time.Millisecond
+	conf.RetransmitMult = 2
+	conf.SuspicionMaxTimeoutMult = 1
+	return conf
+}
 
 func newTestMemberlist(ip net.IP, port int) (*Memberlist, func(), error) {
 	cleanup := func() {}
@@ -23,7 +34,7 @@ func newTestMemberlist(ip net.IP, port int) (*Memberlist, func(), error) {
 	}
 	b.WithKeyRing(keyRing)
 
-	config := DefaultLANConfig()
+	config := defaultTestConfig()
 	config.Label = "label"
 	if ip == nil {
 		ip, cleanup = testaddr.BindAddrs.NextAvailAddr()
@@ -244,6 +255,70 @@ func TestMemberlist_Join_IPv6(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, nsuccess, 1)
 	testJoinState(t, m1, m2)
+}
+
+func TestMemberlist_Join_DeadNode(t *testing.T) {
+	m1, cleanup1, err := newTestMemberlist(nil, 0)
+	defer cleanup1()
+	require.Nil(t, err)
+
+	// a fake node, can connect but doesn't respond
+	addr2, cleanup2 := testaddr.BindAddrs.NextAvailAddr()
+	defer cleanup2()
+	addrStr2 := fmt.Sprintf("%s:%d", addr2, 7946)
+	l, err := net.Listen("tcp", addrStr2)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	defer l.Close()
+
+	// Ensure we don't hang forever
+	timer := time.AfterFunc(100*time.Millisecond, func() {
+		t.Fatalf("should have timeout by now")
+	})
+	defer timer.Stop()
+
+	// can write to remote conn but will not able to read
+	num, err := m1.Join([]string{addrStr2})
+	require.NotNil(t, err)
+	require.Equal(t, num, 0)
+}
+
+func waitForCond(check func() bool) bool {
+	t := time.NewTicker(5 * time.Millisecond)
+	defer t.Stop()
+	for {
+		select {
+		case <-t.C:
+			if check() {
+				return true
+			}
+		case <-time.After(20 * time.Second):
+			return false
+		}
+	}
+}
+
+func TestMemberlist_JoinShutdown(t *testing.T) {
+	m1, cleanup1, err := newTestMemberlist(nil, 0)
+	require.Nil(t, err)
+	defer cleanup1()
+
+	m2, cleanup2, err := newTestMemberlist(nil, 0)
+	require.Nil(t, err)
+	defer cleanup2()
+
+	addr2 := m2.LocalNodeState().Node.UDPAddress().String()
+	n, err := m1.Join([]string{addr2})
+	require.Nil(t, err)
+	require.Equal(t, n, 1)
+	testJoinState(t, m1, m2)
+	m1.Shutdown()
+	if !waitForCond(func() bool {
+		return m2.NumActive() == 1
+	}) {
+		t.Fatalf("expect %d node, got %d", 1, m2.NumActive())
+	}
 }
 
 func TestMemberlist_Leave(t *testing.T) {}
