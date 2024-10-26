@@ -1,6 +1,7 @@
 package memberlist
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"os"
@@ -12,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newTestMemberlist(ip net.IP) (*Memberlist, func(), error) {
+func newTestMemberlist(ip net.IP, port int) (*Memberlist, func(), error) {
 	cleanup := func() {}
 	b := &MemberlistBuilder{}
 	key := []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
@@ -29,6 +30,10 @@ func newTestMemberlist(ip net.IP) (*Memberlist, func(), error) {
 	}
 	config.BindAddr = ip.String()
 	config.ID = config.BindAddr
+	if port != 0 {
+		config.BindPort = port
+		config.ID = fmt.Sprintf("%s:%d", config.BindAddr, config.BindPort)
+	}
 	logger := log.New(os.Stderr, "mtest-"+config.ID+": ", log.LstdFlags)
 	b.WithLogger(logger)
 	b.WithConfig(config)
@@ -52,11 +57,11 @@ func getCleanup(cleanups ...func()) func() {
 }
 
 func twoTestNodes() (*Memberlist, *Memberlist, func(), error) {
-	m1, cleanup1, err := newTestMemberlist(nil)
+	m1, cleanup1, err := newTestMemberlist(nil, 0)
 	if err != nil {
 		return nil, nil, getCleanup(cleanup1), err
 	}
-	m2, cleanup2, err := newTestMemberlist(nil)
+	m2, cleanup2, err := newTestMemberlist(nil, 0)
 	cleanup := getCleanup(cleanup1, cleanup2)
 	if err != nil {
 		return nil, nil, cleanup, err
@@ -65,15 +70,15 @@ func twoTestNodes() (*Memberlist, *Memberlist, func(), error) {
 }
 
 func threeTestNodes() (*Memberlist, *Memberlist, *Memberlist, func(), error) {
-	m1, cleanup1, err := newTestMemberlist(nil)
+	m1, cleanup1, err := newTestMemberlist(nil, 0)
 	if err != nil {
 		return nil, nil, nil, getCleanup(cleanup1), err
 	}
-	m2, cleanup2, err := newTestMemberlist(nil)
+	m2, cleanup2, err := newTestMemberlist(nil, 0)
 	if err != nil {
 		return nil, nil, nil, getCleanup(cleanup1, cleanup2), err
 	}
-	m3, cleanup3, err := newTestMemberlist(nil)
+	m3, cleanup3, err := newTestMemberlist(nil, 0)
 	cleanup := getCleanup(cleanup1, cleanup2, cleanup3)
 	if err != nil {
 		return nil, nil, nil, cleanup, err
@@ -101,7 +106,7 @@ func TestMemberlist_ActiveNodes(t *testing.T) {
 }
 
 func TestMemberlist_Create(t *testing.T) {
-	m, cleanup, err := newTestMemberlist(nil)
+	m, cleanup, err := newTestMemberlist(nil, 0)
 	if cleanup != nil {
 		defer cleanup()
 	}
@@ -155,13 +160,13 @@ func TestMemberlist_JoinSingleNetMask(t *testing.T) {
 }
 
 func TestMemberlist_JoinMultiNetMasks(t *testing.T) {
-	m1, cleanup1, err := newTestMemberlist(nil)
+	m1, cleanup1, err := newTestMemberlist(nil, 0)
 	defer cleanup1()
 	require.Nil(t, err)
 	m1.config.CIDRsAllowed, err = ParseCIDRs([]string{"127.0.0.0/24", "127.0.1.0/24"})
 	require.Nil(t, err)
 
-	m2, cleanup2, err := newTestMemberlist(net.IPv4(127, 0, 1, 11))
+	m2, cleanup2, err := newTestMemberlist(net.IPv4(127, 0, 1, 11), 0)
 	defer cleanup2()
 	require.Nil(t, err)
 	m2.config.CIDRsAllowed, err = ParseCIDRs([]string{"127.0.0.0/24", "127.0.1.0/24"})
@@ -174,7 +179,7 @@ func TestMemberlist_JoinMultiNetMasks(t *testing.T) {
 	testJoinState(t, m1, m2)
 
 	// rouge node from a different network but can "see" m1 and m2
-	m3, cleanup3, err := newTestMemberlist(net.IPv4(127, 0, 2, 10))
+	m3, cleanup3, err := newTestMemberlist(net.IPv4(127, 0, 2, 10), 0)
 	defer cleanup3()
 	require.Nil(t, err)
 	m3.config.CIDRsAllowed, err = ParseCIDRs([]string{"127.0.0.0/8"})
@@ -186,7 +191,7 @@ func TestMemberlist_JoinMultiNetMasks(t *testing.T) {
 	testJoinState(t, m1, m2) // m1, m2 don't see m3
 
 	// rogue node can see m1 and m2 but can not see itself!
-	m4, cleanup4, err := newTestMemberlist(net.IPv4(127, 0, 2, 11))
+	m4, cleanup4, err := newTestMemberlist(net.IPv4(127, 0, 2, 11), 0)
 	defer cleanup4()
 	require.Nil(t, err)
 	m4.config.CIDRsAllowed, err = ParseCIDRs([]string{"127.0.0.0/24", "127.0.1.0/24"})
@@ -196,6 +201,49 @@ func TestMemberlist_JoinMultiNetMasks(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, nsuccess, 1)
 	testJoinState(t, m1, m2) // m1, m2 don't see m3 and m4
+}
+
+func ipv6LoopbackOK(t *testing.T) bool {
+	const ipv6LoopbackAddress = "::1"
+	ifaces, err := net.Interfaces()
+	require.NoError(t, err)
+
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagLoopback == 0 {
+			continue
+		}
+		addrs, err := iface.Addrs()
+		require.NoError(t, err)
+
+		for _, addr := range addrs {
+			ipaddr := addr.(*net.IPNet)
+			if ipaddr.IP.String() == ipv6LoopbackAddress {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func TestMemberlist_Join_IPv6(t *testing.T) {
+	if !ipv6LoopbackOK(t) {
+		t.SkipNow()
+		return
+	}
+
+	m1, cleanup1, err := newTestMemberlist(net.IPv6loopback, 23456)
+	defer cleanup1()
+	require.Nil(t, err)
+
+	m2, cleanup2, err := newTestMemberlist(net.IPv6loopback, 23457)
+	defer cleanup2()
+	require.Nil(t, err)
+
+	addr := m2.LocalNodeState().Node.UDPAddress().String()
+	nsuccess, err := m1.Join([]string{addr})
+	require.Nil(t, err)
+	require.Equal(t, nsuccess, 1)
+	testJoinState(t, m1, m2)
 }
 
 func TestMemberlist_Leave(t *testing.T) {}
