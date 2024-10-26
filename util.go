@@ -22,8 +22,8 @@ import (
 func init() {
 	// Seed the random number generator
 	seed.Init()
-
 }
+
 func encode(t msgType, in interface{}) ([]byte, error) {
 	buf := bytes.NewBuffer(nil)
 	buf.WriteByte(uint8(t))
@@ -52,7 +52,6 @@ func splitToCompoundMsgs(msgs [][]byte) [][]byte {
 	if len(msgs) > 0 {
 		split = append(split, packCompoundMsg(msgs))
 	}
-
 	return split
 }
 
@@ -98,7 +97,6 @@ func unpackCompoundMsg(msg []byte) (trunc int, msgs [][]byte, err error) {
 			return
 		}
 
-		// Extract the slice, seek past on the buffer
 		slice := msg[:msgLen]
 		msg = msg[msgLen:]
 		msgs = append(msgs, slice)

@@ -185,7 +185,7 @@ func (m *Memberlist) mergeState(remote []stateToMerge) {
 			}
 			m.aliveNode(&a, nil)
 		case StateLeft:
-			d := dead{Lives: r.Lives, ID: r.ID}
+			d := dead{Lives: r.Lives, ID: r.ID, Left: true}
 			m.deadNode(&d, nil)
 		case StateDead: // prefer suspect
 			fallthrough

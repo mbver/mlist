@@ -222,11 +222,11 @@ func (m *Memberlist) suspectNode(s *suspect) {
 
 		if proceed {
 			if confirms < confirmCap { // timeout before reaching enough confirms
-				// metrics.IncrCounterWithLabels([]string{"memberlist", "degraded", "timeout"}, 1, m.metricLabels)
+				m.logger.Printf("degraded: timeout before reaching enough confirms %d/%d", confirms, confirmCap)
 			}
 
-			// m.logger.Printf("[INFO] memberlist: Marking %s as failed, suspect timeout reached (%d peer confirmations)",
-			// 	state.Name, nConfirm)
+			m.logger.Printf("[INFO] memberlist: Marking %s as failed, suspect timeout reached (%d peer confirmations)",
+				node.Node.ID, confirms)
 			m.deadNode(d, nil)
 		}
 	}

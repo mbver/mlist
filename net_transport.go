@@ -230,7 +230,7 @@ func (t *NetTransport) udpListen(c *net.UDPConn) {
 
 		// msg must have at least 1 byte
 		if n < 1 {
-			// t.logger.Printf("[ERR] memberlist: UDP packet too short (%d bytes) %s", len(buf), LogAddress(addr))
+			t.logger.Printf("[ERR] memberlist: UDP packet too short (%d bytes) from %s", len(buf), addr)
 			continue
 		}
 
