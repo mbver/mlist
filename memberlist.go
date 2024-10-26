@@ -12,31 +12,30 @@ import (
 )
 
 type Memberlist struct {
-	lives          uint32
-	awr            *awareness
-	config         *Config
-	keyring        *Keyring
-	transport      *NetTransport
-	logger         *log.Logger
-	shutdownL      sync.Mutex // guard shutdown, shutdownCh
-	shutdownCh     chan struct{}
-	shutdown       bool
-	leaveL         sync.Mutex
-	left           int32
-	mbroadcasts    *TransmitCapQueue
-	ubroadcasts    UserBroadcasts
-	longRunMng     *longRunMsgManager
-	usrMsgCh       chan<- []byte
-	pingMng        *pingManager
-	eventMng       *EventManager
-	numPushPull    uint32
-	nodeL          sync.RWMutex // guard nodes, nodeMap
-	nodes          []*nodeState
-	nodeMap        map[string]*nodeState
-	numNodes       int32 // allow concurrent access
-	suspicions     map[string]*suspicion
-	stopScheduleCh chan struct{}
-	probeIdx       int
+	lives       uint32
+	awr         *awareness
+	config      *Config
+	keyring     *Keyring
+	transport   *NetTransport
+	logger      *log.Logger
+	shutdownL   sync.Mutex // guard shutdown, shutdownCh
+	shutdownCh  chan struct{}
+	shutdown    bool
+	leaveL      sync.Mutex
+	left        int32
+	mbroadcasts *TransmitCapQueue
+	ubroadcasts UserBroadcasts
+	longRunMng  *longRunMsgManager
+	usrMsgCh    chan<- []byte
+	pingMng     *pingManager
+	eventMng    *EventManager
+	numPushPull uint32
+	nodeL       sync.RWMutex // guard nodes, nodeMap
+	nodes       []*nodeState
+	nodeMap     map[string]*nodeState
+	numNodes    int32 // allow concurrent access
+	suspicions  map[string]*suspicion
+	probeIdx    int
 }
 
 type MemberlistBuilder struct {
@@ -126,20 +125,20 @@ func (b *MemberlistBuilder) Build() (*Memberlist, error) {
 	}
 
 	m := &Memberlist{
-		awr:            newAwareness(b.config.MaxAwarenessHealth),
-		config:         b.config,
-		keyring:        b.keyring,
-		transport:      t,
-		logger:         b.logger,
-		shutdownCh:     make(chan struct{}),
-		ubroadcasts:    b.ubroadcasts,
-		usrMsgCh:       b.usrMsgCh,
-		longRunMng:     newLongRunMsgManager(b.config.MaxLongRunQueueDepth),
-		pingMng:        newPingManager(b.pingDelegate),
-		eventMng:       &EventManager{b.eventCh},
-		nodeMap:        map[string]*nodeState{},
-		suspicions:     map[string]*suspicion{},
-		stopScheduleCh: make(chan struct{}),
+		awr:         newAwareness(b.config.MaxAwarenessHealth),
+		config:      b.config,
+		keyring:     b.keyring,
+		transport:   t,
+		logger:      b.logger,
+		shutdownCh:  make(chan struct{}),
+		ubroadcasts: b.ubroadcasts,
+		usrMsgCh:    b.usrMsgCh,
+		longRunMng:  newLongRunMsgManager(b.config.MaxLongRunQueueDepth),
+		pingMng:     newPingManager(b.pingDelegate),
+		eventMng:    &EventManager{b.eventCh},
+		nodeMap:     map[string]*nodeState{},
+		suspicions:  map[string]*suspicion{},
+		probeIdx:    -1,
 	}
 	m.mbroadcasts = NewBroadcastQueue(m.getNumNodes, m.config.RetransmitMult)
 
@@ -342,10 +341,9 @@ func (m *Memberlist) Shutdown() {
 	if m.shutdown {
 		return
 	}
-	m.deschedule()
+	close(m.shutdownCh)
 	m.shutdown = true
 	m.transport.Shutdown()
-	close(m.shutdownCh)
 }
 
 func (m *Memberlist) hasShutdown() bool {

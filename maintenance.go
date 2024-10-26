@@ -11,21 +11,17 @@ import (
 // call just once
 func (m *Memberlist) schedule() {
 	if m.config.ProbeInterval > 0 {
-		go m.scheduleFunc(m.config.ProbeInterval, m.stopScheduleCh, m.probe)
+		go m.scheduleFunc(m.config.ProbeInterval, m.shutdownCh, m.probe)
 	}
 	if m.config.GossipInterval > 0 && m.config.GossipNodes > 0 {
-		go m.scheduleFunc(m.config.GossipInterval, m.stopScheduleCh, m.gossip)
+		go m.scheduleFunc(m.config.GossipInterval, m.shutdownCh, m.gossip)
 	}
 	if m.config.ReapInterval > 0 {
-		go m.scheduleFunc(m.config.ReapInterval, m.stopScheduleCh, m.reap)
+		go m.scheduleFunc(m.config.ReapInterval, m.shutdownCh, m.reap)
 	}
 	if m.config.PushPullInterval > 0 {
-		go m.scheduleFuncWithScale(m.config.PushPullInterval, m.stopScheduleCh, pushPullScale, m.pushPull)
+		go m.scheduleFuncWithScale(m.config.PushPullInterval, m.shutdownCh, pushPullScale, m.pushPull)
 	}
-}
-
-func (m *Memberlist) deschedule() {
-	close(m.stopScheduleCh)
 }
 
 func (m *Memberlist) scheduleFunc(interval time.Duration, stopCh chan struct{}, f func()) {
@@ -106,7 +102,6 @@ PICKNODE:
 		// check if it is ok to pick
 		if acceptFn != nil && !acceptFn(node) {
 			continue
-
 		}
 		// check if it is already picked
 		for j := 0; j < len(picked); j++ {
@@ -185,7 +180,7 @@ WAIT:
 
 	missedNacks := indirectRes.numNode - indirectRes.nNacks
 	m.awr.Punish(missedNacks)
-	// m.logger.Printf("[INFO] memberlist: Suspect %s has failed, no acks received", node.Name)
+	m.logger.Printf("[INFO] memberlist: Suspect %s has failed, no acks received", node.Node.ID)
 	s := suspect{Lives: node.Lives, ID: node.Node.ID, From: m.config.ID}
 	m.suspectNode(&s)
 }
