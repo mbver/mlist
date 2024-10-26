@@ -204,11 +204,7 @@ func (t *NetTransport) tcpListen(l *net.TCPListener) {
 		// No error, reset loop delay
 		loopDelay = 0
 
-		select {
-		case t.tcpConnCh <- conn:
-		default:
-			t.logger.Printf("[DEBUG] transport: drop tcp conn")
-		}
+		t.tcpConnCh <- conn
 	}
 }
 
@@ -239,17 +235,11 @@ func (t *NetTransport) udpListen(c *net.UDPConn) {
 			t.logger.Printf("[ERR] transport: UDP packet too short (%d bytes) from %s", len(buf), addr)
 			continue
 		}
-		packet := &Packet{
+		t.packetCh <- &Packet{
 			Buf:       buf[:n],
 			From:      udpAddr,
 			Timestamp: ts,
 		}
-		select {
-		case t.packetCh <- packet:
-		default:
-			t.logger.Printf("[DEBUG] transport: drop udp packet")
-		}
-
 	}
 }
 

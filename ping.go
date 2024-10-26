@@ -213,7 +213,6 @@ func (m *Memberlist) IndirectPing(node *nodeState, timeout time.Duration) chan i
 			return
 		}
 
-		// pickRandomNodes should hold the lock!
 		peers := m.pickRandomNodes(m.config.NumIndirectChecks, func(n *nodeState) bool {
 			return n.Node.ID != m.config.ID &&
 				n.Node.ID != node.Node.ID &&

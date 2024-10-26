@@ -19,7 +19,7 @@ func defaultTestConfig() *Config {
 	conf := DefaultLANConfig()
 	conf.TcpTimeout = 50 * time.Millisecond
 	conf.PingTimeout = 20 * time.Millisecond
-	conf.ProbeInterval = 50 * time.Millisecond
+	conf.ProbeInterval = 60 * time.Millisecond
 	conf.GossipInterval = 20 * time.Millisecond
 	conf.BroadcastWaitTimeout = 100 * time.Millisecond
 	conf.RetransmitMult = 2
@@ -27,7 +27,11 @@ func defaultTestConfig() *Config {
 	return conf
 }
 
-func newTestMemberlist(ip net.IP, port int) (*Memberlist, func(), error) {
+func defaultTestMemberlist() (*Memberlist, func(), error) {
+	return newTestMemberlist(nil, 0, nil)
+}
+
+func newTestMemberlist(ip net.IP, port int, conf *Config) (*Memberlist, func(), error) {
 	cleanup := func() {}
 	b := &MemberlistBuilder{}
 	key := []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
@@ -37,20 +41,22 @@ func newTestMemberlist(ip net.IP, port int) (*Memberlist, func(), error) {
 	}
 	b.WithKeyRing(keyRing)
 
-	config := defaultTestConfig()
-	config.Label = "label"
+	if conf == nil {
+		conf = defaultTestConfig()
+	}
+	conf.Label = "label"
 	if ip == nil {
 		ip, cleanup = testaddr.BindAddrs.NextAvailAddr()
 	}
-	config.BindAddr = ip.String()
-	config.ID = config.BindAddr
+	conf.BindAddr = ip.String()
+	conf.ID = conf.BindAddr
 	if port != 0 {
-		config.BindPort = port
-		config.ID = fmt.Sprintf("%s:%d", config.BindAddr, config.BindPort)
+		conf.BindPort = port
+		conf.ID = fmt.Sprintf("%s:%d", conf.BindAddr, conf.BindPort)
 	}
-	logger := log.New(os.Stderr, "mtest-"+config.ID+": ", log.LstdFlags)
+	logger := log.New(os.Stderr, "mtest-"+conf.ID+": ", log.LstdFlags)
 	b.WithLogger(logger)
-	b.WithConfig(config)
+	b.WithConfig(conf)
 	m, err := b.Build()
 	if err != nil {
 		return nil, cleanup, err
@@ -71,29 +77,16 @@ func getCleanup(cleanups ...func()) func() {
 }
 
 func twoTestNodes() (*Memberlist, *Memberlist, func(), error) {
-	m1, cleanup1, err := newTestMemberlist(nil, 0)
+	m1, cleanup1, err := defaultTestMemberlist()
 	if err != nil {
 		return nil, nil, getCleanup(cleanup1), err
 	}
-	m2, cleanup2, err := newTestMemberlist(nil, 0)
+	m2, cleanup2, err := defaultTestMemberlist()
 	cleanup := getCleanup(cleanup1, cleanup2)
 	if err != nil {
 		return nil, nil, cleanup, err
 	}
 	return m1, m2, cleanup, nil
-}
-
-func threeTestNodes() (*Memberlist, *Memberlist, *Memberlist, func(), error) {
-	m1, m2, cleanup1, err := twoTestNodes()
-	if err != nil {
-		return nil, nil, nil, cleanup1, err
-	}
-	m3, cleanup3, err := newTestMemberlist(nil, 0)
-	cleanup := getCleanup(cleanup1, cleanup3)
-	if err != nil {
-		return nil, nil, nil, cleanup, err
-	}
-	return m1, m2, m3, cleanup, nil
 }
 
 func TestMemberlist_ActiveNodes(t *testing.T) {
@@ -116,7 +109,7 @@ func TestMemberlist_ActiveNodes(t *testing.T) {
 }
 
 func TestMemberlist_Create(t *testing.T) {
-	m, cleanup, err := newTestMemberlist(nil, 0)
+	m, cleanup, err := defaultTestMemberlist()
 	if cleanup != nil {
 		defer cleanup()
 	}
@@ -170,13 +163,13 @@ func TestMemberlist_JoinSingleNetMask(t *testing.T) {
 }
 
 func TestMemberlist_JoinMultiNetMasks(t *testing.T) {
-	m1, cleanup1, err := newTestMemberlist(nil, 0)
+	m1, cleanup1, err := defaultTestMemberlist()
 	defer cleanup1()
 	require.Nil(t, err)
 	m1.config.CIDRsAllowed, err = ParseCIDRs([]string{"127.0.0.0/24", "127.0.1.0/24"})
 	require.Nil(t, err)
 
-	m2, cleanup2, err := newTestMemberlist(net.IPv4(127, 0, 1, 11), 0)
+	m2, cleanup2, err := newTestMemberlist(net.IPv4(127, 0, 1, 11), 0, nil)
 	defer cleanup2()
 	require.Nil(t, err)
 	m2.config.CIDRsAllowed, err = ParseCIDRs([]string{"127.0.0.0/24", "127.0.1.0/24"})
@@ -189,7 +182,7 @@ func TestMemberlist_JoinMultiNetMasks(t *testing.T) {
 	testJoinState(t, m1, m2)
 
 	// rouge node from a different network but can "see" m1 and m2
-	m3, cleanup3, err := newTestMemberlist(net.IPv4(127, 0, 2, 10), 0)
+	m3, cleanup3, err := newTestMemberlist(net.IPv4(127, 0, 2, 10), 0, nil)
 	defer cleanup3()
 	require.Nil(t, err)
 	m3.config.CIDRsAllowed, err = ParseCIDRs([]string{"127.0.0.0/8"})
@@ -201,7 +194,7 @@ func TestMemberlist_JoinMultiNetMasks(t *testing.T) {
 	testJoinState(t, m1, m2) // m1, m2 don't see m3
 
 	// rogue node can see m1 and m2 but can not see itself!
-	m4, cleanup4, err := newTestMemberlist(net.IPv4(127, 0, 2, 11), 0)
+	m4, cleanup4, err := newTestMemberlist(net.IPv4(127, 0, 2, 11), 0, nil)
 	defer cleanup4()
 	require.Nil(t, err)
 	m4.config.CIDRsAllowed, err = ParseCIDRs([]string{"127.0.0.0/24", "127.0.1.0/24"})
@@ -241,11 +234,11 @@ func TestMemberlist_Join_IPv6(t *testing.T) {
 		return
 	}
 
-	m1, cleanup1, err := newTestMemberlist(net.IPv6loopback, 23456)
+	m1, cleanup1, err := newTestMemberlist(net.IPv6loopback, 23456, nil)
 	defer cleanup1()
 	require.Nil(t, err)
 
-	m2, cleanup2, err := newTestMemberlist(net.IPv6loopback, 23457)
+	m2, cleanup2, err := newTestMemberlist(net.IPv6loopback, 23457, nil)
 	defer cleanup2()
 	require.Nil(t, err)
 
@@ -257,7 +250,7 @@ func TestMemberlist_Join_IPv6(t *testing.T) {
 }
 
 func TestMemberlist_Join_DeadNode(t *testing.T) {
-	m1, cleanup1, err := newTestMemberlist(nil, 0)
+	m1, cleanup1, err := newTestMemberlist(nil, 0, nil)
 	defer cleanup1()
 	require.Nil(t, err)
 

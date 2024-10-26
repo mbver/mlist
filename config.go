@@ -20,7 +20,6 @@ type Config struct {
 	TcpTimeout              time.Duration
 	NumIndirectChecks       int
 	PingTimeout             time.Duration
-	ProbeTimeout            time.Duration
 	ProbeInterval           time.Duration
 	GossipNodes             int
 	GossipInterval          time.Duration
