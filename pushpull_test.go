@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestPushPull(t *testing.T) {
+func TestPushPull_SendReceive(t *testing.T) {
 	m1, cleanup1, err := newTestMemberlistNoSchedule()
 	defer cleanup1()
 	require.Nil(t, err)
