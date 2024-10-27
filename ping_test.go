@@ -15,21 +15,29 @@ func newTestMemberlistNoSchedule() (*Memberlist, func(), error) {
 	conf.GossipInterval = 0
 	conf.ProbeInterval = 0
 	conf.PushPullInterval = 0
-	conf.RetransmitMult = 0
 	return newTestMemberlist(nil, 0, conf)
 }
 
-func threePingTestNodes() (*Memberlist, *Memberlist, *Memberlist, func(), error) {
+func twoNodesNoSchedule() (*Memberlist, *Memberlist, func(), error) {
 	m1, cleanup1, err := newTestMemberlistNoSchedule()
+	if err != nil {
+		return nil, nil, cleanup1, err
+	}
+	m2, cleanup2, err := newTestMemberlistNoSchedule()
+	cleanup := getCleanup(cleanup1, cleanup2)
+	if err != nil {
+		return nil, nil, cleanup, err
+	}
+	return m1, m2, cleanup, nil
+}
+
+func threeNodesNoSchedule() (*Memberlist, *Memberlist, *Memberlist, func(), error) {
+	m1, m2, cleanup1, err := twoNodesNoSchedule()
 	if err != nil {
 		return nil, nil, nil, cleanup1, err
 	}
-	m2, cleanup2, err := newTestMemberlistNoSchedule()
-	if err != nil {
-		return nil, nil, nil, getCleanup(cleanup1, cleanup2), err
-	}
 	m3, cleanup3, err := newTestMemberlistNoSchedule()
-	cleanup := getCleanup(cleanup1, cleanup2, cleanup3)
+	cleanup := getCleanup(cleanup1, cleanup3)
 	if err != nil {
 		return nil, nil, nil, cleanup, err
 	}
@@ -47,7 +55,7 @@ func retry(fn func() (bool, string)) (success bool, msg string) {
 }
 
 func TestPing(t *testing.T) {
-	m1, m2, m3, cleanup, err := threePingTestNodes()
+	m1, m2, m3, cleanup, err := threeNodesNoSchedule()
 	defer cleanup()
 	require.Nil(t, err)
 

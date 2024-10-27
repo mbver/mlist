@@ -57,12 +57,8 @@ func TestPickRandomNodes(t *testing.T) {
 }
 
 func TestMemberlist_PushPull(t *testing.T) {
-	m1, cleanup1, err := newTestMemberlistNoSchedule()
-	defer cleanup1()
-	require.Nil(t, err)
-
-	m2, cleanup2, err := newTestMemberlistNoSchedule()
-	defer cleanup2()
+	m1, m2, cleanup, err := twoNodesNoSchedule()
+	defer cleanup()
 	require.Nil(t, err)
 
 	joinAndTest(t, m1, m2)
@@ -98,6 +94,94 @@ func TestMemberlist_PushPull(t *testing.T) {
 		return true, ""
 	})
 	require.True(t, success, msg)
+}
+
+func TestMemberlist_Gossip(t *testing.T) {
+	m1, m2, m3, cleanup, err := threeNodesNoSchedule()
+	defer cleanup()
+	require.Nil(t, err)
+
+	node1 := m1.LocalNodeState()
+	node2 := m2.LocalNodeState()
+	node3 := m3.LocalNodeState()
+
+	for _, n := range []*nodeState{node2, node3} {
+		a := alive{
+			Lives: 1,
+			ID:    n.Node.ID,
+			IP:    n.Node.IP,
+			Port:  n.Node.Port,
+			Tags:  n.Node.Tags,
+		}
+		m1.aliveNode(&a, nil)
+	}
+
+	success, msg := retry(func() (bool, string) {
+		m1.gossip()
+		m1.gossip()
+		time.Sleep(10 * time.Millisecond)
+		for _, m := range []*Memberlist{m2, m3} {
+			if m.NumActive() != 3 {
+				return false, "expect 3 active nodes"
+			}
+			nodes := m.ActiveNodes()
+			found := []bool{false, false, false}
+			for _, n1 := range nodes {
+				for i, n2 := range []*Node{node1.Node, node2.Node, node3.Node} {
+					if reflect.DeepEqual(n1, n2) {
+						found[i] = true
+					}
+				}
+			}
+			for _, ok := range found {
+				if !ok {
+					return false, "missing node"
+				}
+			}
+		}
+		return true, ""
+	})
+
+	require.True(t, success, msg)
+}
+
+func TestMemberlist_GossipToDead(t *testing.T) {
+	m1, m2, cleanup, err := twoNodesNoSchedule()
+	defer cleanup()
+	require.Nil(t, err)
+
+	node := m2.LocalNodeState()
+	node.State = StateDead
+	node.StateChange = time.Now().Add(-m1.config.DeadNodeExpiredTimeout - 10*time.Millisecond)
+
+	m1.nodeL.Lock()
+	m1.nodes = append(m1.nodes, node)
+	m1.nodeMap[node.Node.ID] = node
+	m1.nodeL.Unlock()
+
+	m1.gossip()
+
+	time.Sleep(100 * time.Millisecond)
+	require.Equal(t, 1, m2.NumActive())
+
+	m1.nodeL.Lock()
+	m1.nodes[1].StateChange = time.Now().Add(-10 * time.Millisecond)
+	m1.nodeL.Unlock()
+
+	retry(func() (bool, string) {
+		m1.gossip()
+		time.Sleep(50 * time.Millisecond)
+		if m2.NumActive() != 2 {
+			return false, "expect 2 active nodes"
+		}
+		nodes := m2.ActiveNodes()
+		for _, n := range nodes {
+			if n.ID == m2.config.ID && n.IP.String() == m2.config.BindAddr {
+				return true, ""
+			}
+		}
+		return false, "node 2 not found"
+	})
 }
 
 func TestProbeNode(t *testing.T) {}
