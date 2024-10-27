@@ -7,6 +7,8 @@ import (
 	"log"
 	"net"
 	"os"
+	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -248,6 +250,64 @@ func TestNetTransport_SendReceiveTCP(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, decRes.SeqNo, res.SeqNo)
 	require.Equal(t, decRes.Payload, res.Payload)
+}
+
+// specialized to count error in tcp backoff
+type countWriter struct {
+	t        *testing.T
+	numCalls *int32
+}
+
+func (w *countWriter) Write(p []byte) (n int, err error) {
+	atomic.AddInt32(w.numCalls, 1)
+	if !strings.Contains(string(p), "memberlist: Error accepting TCP connection") {
+		w.t.Error("did not receive expected log message")
+	}
+	w.t.Log("record tcp error")
+	return len(p), nil
+}
+
+func TestNetTransport_TcpBackoff(t *testing.T) {
+	var numErr int32
+	w := countWriter{t, &numErr}
+	logger := log.New(&w, "test", log.LstdFlags)
+
+	tr := NetTransport{
+		tcpConnCh: make(chan net.Conn),
+		logger:    logger,
+	}
+
+	tr.wg.Add(1)
+
+	ip, cleanup := testaddr.BindAddrs.NextAvailAddr()
+	addr := net.TCPAddr{
+		IP:   ip,
+		Port: 7946,
+	}
+	defer cleanup()
+	l, err := net.ListenTCP("tcp", &addr)
+	require.Nil(t, err)
+	err = l.Close()
+	require.Nil(t, err)
+
+	go tr.tcpListen(l)
+
+	time.Sleep(4 * time.Second)
+	atomic.StoreInt32(&tr.shutdown, 1)
+
+	done := make(chan struct{})
+	go func() {
+		tr.wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(1 * time.Second):
+		t.Error("timeout waiting for transport tcpListen to stop")
+	}
+
+	require.True(t, numErr > 8)
+	require.True(t, numErr < 14)
 }
 
 func TestResolveAddr(t *testing.T) {
