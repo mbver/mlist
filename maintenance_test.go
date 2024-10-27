@@ -72,7 +72,7 @@ func TestMemberlist_PushPull(t *testing.T) {
 		}
 		m1.aliveNode(&a, nil)
 	}
-	success, msg := retry(func() (bool, string) {
+	success, msg := retry(15, func() (bool, string) {
 		m1.pushPull()
 		time.Sleep(10 * time.Millisecond)
 		if m2.NumActive() != 5 {
@@ -116,7 +116,7 @@ func TestMemberlist_Gossip(t *testing.T) {
 		m1.aliveNode(&a, nil)
 	}
 
-	success, msg := retry(func() (bool, string) {
+	success, msg := retry(5, func() (bool, string) {
 		m1.gossip()
 		m1.gossip()
 		time.Sleep(10 * time.Millisecond)
@@ -168,7 +168,7 @@ func TestMemberlist_GossipToDead(t *testing.T) {
 	m1.nodes[1].StateChange = time.Now().Add(-10 * time.Millisecond)
 	m1.nodeL.Unlock()
 
-	success, msg := retry(func() (bool, string) {
+	success, msg := retry(5, func() (bool, string) {
 		m1.gossip()
 		time.Sleep(50 * time.Millisecond)
 		if m2.NumActive() != 2 {

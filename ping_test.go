@@ -45,8 +45,8 @@ func threeNodesNoSchedule() (*Memberlist, *Memberlist, *Memberlist, func(), erro
 	return m1, m2, m3, cleanup, nil
 }
 
-func retry(fn func() (bool, string)) (success bool, msg string) {
-	for i := 0; i < 5; i++ {
+func retry(times int, fn func() (bool, string)) (success bool, msg string) {
+	for i := 0; i < times; i++ {
 		success, msg = fn()
 		if success {
 			return
@@ -80,7 +80,7 @@ func TestPing(t *testing.T) {
 
 	// pick random node is very likely to fail if
 	// we only have 3 nodes in the list. retry once again.
-	success, msg := retry(func() (bool, string) {
+	success, msg := retry(5, func() (bool, string) {
 		resCh := m1.IndirectPing(node2, timeout)
 		select {
 		case res := <-resCh:
@@ -110,7 +110,7 @@ func TestPing(t *testing.T) {
 	conn, _ := m2.transport.getFirstConn()
 	conn.Close()
 
-	success, msg = retry(func() (bool, string) {
+	success, msg = retry(5, func() (bool, string) {
 		resCh := m1.IndirectPing(node2, timeout)
 		select {
 		case res := <-resCh:
@@ -130,7 +130,7 @@ func TestPing(t *testing.T) {
 	conn, _ = m3.transport.getFirstConn()
 	conn.Close()
 
-	success, msg = retry(func() (bool, string) {
+	success, msg = retry(5, func() (bool, string) {
 		resCh := m1.IndirectPing(node2, timeout)
 		select {
 		case res := <-resCh:
