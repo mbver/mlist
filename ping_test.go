@@ -11,7 +11,6 @@ import (
 func newTestPingMemberlist() (*Memberlist, func(), error) {
 	conf := defaultTestConfig()
 	// deactive gossip, probe and pushpull scheduler
-	// deactive
 	// so they don't interfere with the ping test
 	conf.GossipInterval = 0
 	conf.ProbeInterval = 0
@@ -52,13 +51,7 @@ func TestPing(t *testing.T) {
 	defer cleanup()
 	require.Nil(t, err)
 
-	pingTimeout := 10 * time.Millisecond
-	probeTimeout := 50 * time.Millisecond
-
 	node2 := m2.LocalNodeState()
-	if !m1.Ping(node2, pingTimeout) {
-		t.Fatalf("failed ping")
-	}
 	node3 := m3.LocalNodeState()
 
 	m1.nodeL.Lock()
@@ -67,6 +60,12 @@ func TestPing(t *testing.T) {
 	m1.nodes = append(m1.nodes, node3)
 	m1.nodeMap[node3.Node.ID] = node3
 	m1.nodeL.Unlock()
+	pingTimeout := 10 * time.Millisecond
+	probeTimeout := 50 * time.Millisecond
+
+	if !m1.Ping(node2, pingTimeout) {
+		t.Fatalf("failed ping")
+	}
 
 	timeout := probeTimeout - pingTimeout
 

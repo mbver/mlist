@@ -20,7 +20,7 @@ type Memberlist struct {
 	logger      *log.Logger
 	shutdownL   sync.Mutex // guard shutdown, shutdownCh
 	shutdownCh  chan struct{}
-	shutdown    bool
+	shutdown    int32
 	leaveL      sync.Mutex
 	left        int32
 	mbroadcasts *TransmitCapQueue
@@ -338,18 +338,16 @@ func (m *Memberlist) getNumNodes() int {
 func (m *Memberlist) Shutdown() {
 	m.shutdownL.Lock()
 	defer m.shutdownL.Unlock()
-	if m.shutdown {
+	if m.hasShutdown() {
 		return
 	}
-	m.shutdown = true
+	atomic.StoreInt32(&m.shutdown, 1)
 	m.transport.Shutdown()
 	close(m.shutdownCh) // close after transport shutdown so PacketCh is not blocked.
 }
 
 func (m *Memberlist) hasShutdown() bool {
-	m.shutdownL.Lock()
-	defer m.shutdownL.Unlock()
-	return m.shutdown
+	return atomic.LoadInt32(&m.shutdown) == 1
 }
 
 func (m *Memberlist) hasLeft() bool {
