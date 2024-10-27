@@ -8,6 +8,18 @@ const (
 	NodeUpdate
 )
 
+func (t NodeEventType) String() string {
+	switch t {
+	case NodeJoin:
+		return "join"
+	case NodeLeave:
+		return "leave"
+	case NodeUpdate:
+		return "update"
+	}
+	return "unknown event"
+}
+
 type NodeEvent struct {
 	Type NodeEventType
 	Node *Node
