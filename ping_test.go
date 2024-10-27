@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newTestPingMemberlist() (*Memberlist, func(), error) {
+func newTestMemberlistNoSchedule() (*Memberlist, func(), error) {
 	conf := defaultTestConfig()
 	// deactive gossip, probe and pushpull scheduler
 	// so they don't interfere with the ping test
@@ -20,15 +20,15 @@ func newTestPingMemberlist() (*Memberlist, func(), error) {
 }
 
 func threePingTestNodes() (*Memberlist, *Memberlist, *Memberlist, func(), error) {
-	m1, cleanup1, err := newTestPingMemberlist()
+	m1, cleanup1, err := newTestMemberlistNoSchedule()
 	if err != nil {
 		return nil, nil, nil, cleanup1, err
 	}
-	m2, cleanup2, err := newTestPingMemberlist()
+	m2, cleanup2, err := newTestMemberlistNoSchedule()
 	if err != nil {
 		return nil, nil, nil, getCleanup(cleanup1, cleanup2), err
 	}
-	m3, cleanup3, err := newTestPingMemberlist()
+	m3, cleanup3, err := newTestMemberlistNoSchedule()
 	cleanup := getCleanup(cleanup1, cleanup2, cleanup3)
 	if err != nil {
 		return nil, nil, nil, cleanup, err
