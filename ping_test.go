@@ -15,6 +15,7 @@ func newTestMemberlistNoSchedule() (*Memberlist, func(), error) {
 	conf.GossipInterval = 0
 	conf.ProbeInterval = 0
 	conf.PushPullInterval = 0
+	conf.ReapInterval = 0
 	return newTestMemberlist(nil, 0, conf)
 }
 

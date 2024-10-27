@@ -9,6 +9,63 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestPushPull_MergeState(t *testing.T) {
+	m, cleanup, err := newTestMemberlistNoSchedule()
+	defer cleanup()
+	require.Nil(t, err)
+	m.config.ProbeInterval = 2 * time.Second // used to compute suspicion timeout, not for scheduling
+	for i := 0; i < 3; i++ {
+		a := alive{
+			Lives: 1,
+			ID:    fmt.Sprintf("test%d", i),
+			IP:    []byte{127, 0, 0, byte(i)},
+			Port:  7946,
+		}
+		m.aliveNode(&a, nil)
+	}
+
+	s := suspect{Lives: 1, ID: "test0"}
+	m.suspectNode(&s)
+
+	remote := make([]stateToMerge, 4)
+	for i := 0; i < 4; i++ {
+		remote[i] = stateToMerge{
+			Lives: 1,
+			ID:    fmt.Sprintf("test%d", i),
+			IP:    []byte{127, 0, 0, byte(i)},
+			Port:  7946,
+			State: StateAlive,
+		}
+	}
+	remote[0].Lives = 2
+	remote[1].State = StateSuspect
+	remote[2].State = StateDead
+	remote[3].Lives = 2
+
+	m.mergeState(remote)
+
+	require.Equal(t, 5, m.getNumNodes())
+	node := m.GetNodeState("test0")
+	if node.State != StateAlive || node.Lives != 2 {
+		t.Fatalf("bad node %+v", node)
+	}
+
+	node = m.GetNodeState("test1")
+	if node.State != StateSuspect || node.Lives != 1 {
+		t.Fatalf("bad node %+v", node)
+	}
+
+	node = m.GetNodeState("test2")
+	if node.State != StateSuspect || node.Lives != 1 {
+		t.Fatalf("bad node %+v", node)
+	}
+
+	node = m.GetNodeState("test3")
+	if node.State != StateAlive || node.Lives != 2 {
+		t.Fatalf("bad node %+v", node)
+	}
+}
+
 func TestPushPull_SendReceive(t *testing.T) {
 	m1, cleanup1, err := newTestMemberlistNoSchedule()
 	defer cleanup1()
