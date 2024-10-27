@@ -168,7 +168,7 @@ func TestMemberlist_GossipToDead(t *testing.T) {
 	m1.nodes[1].StateChange = time.Now().Add(-10 * time.Millisecond)
 	m1.nodeL.Unlock()
 
-	retry(func() (bool, string) {
+	success, msg := retry(func() (bool, string) {
 		m1.gossip()
 		time.Sleep(50 * time.Millisecond)
 		if m2.NumActive() != 2 {
@@ -182,6 +182,7 @@ func TestMemberlist_GossipToDead(t *testing.T) {
 		}
 		return false, "node 2 not found"
 	})
+	require.True(t, success, msg)
 }
 
 func TestProbeNode(t *testing.T) {}
