@@ -1,6 +1,7 @@
 package memberlist
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 	"time"
@@ -53,6 +54,65 @@ func retry(times int, fn func() (bool, string)) (success bool, msg string) {
 		}
 	}
 	return
+}
+
+func ackHandlerExists(m *pingManager, seqNo uint32) bool {
+	m.l.Lock()
+	defer m.l.Unlock()
+	_, ok := m.ackHandlers[seqNo]
+	return ok
+}
+
+func indirectAckHandlerExists(m *pingManager, seqNo uint32) bool {
+	m.l.Lock()
+	defer m.l.Unlock()
+	_, ok := m.indirectAckHandlers[seqNo]
+	return ok
+}
+func TestPing_SetAckHandler(t *testing.T) {
+	m := newPingManager(nil)
+	m.setAckHandler(1, nil, 10*time.Millisecond)
+	require.True(t, ackHandlerExists(m, 1))
+	time.Sleep(15 * time.Millisecond)
+	require.False(t, ackHandlerExists(m, 1))
+}
+
+func TestPing_SetIndirectAckHandler(t *testing.T) {
+	m := newPingManager(nil)
+	m.setIndirectAckHandler(1, nil, nil, 10*time.Millisecond)
+	require.True(t, indirectAckHandlerExists(m, 1))
+	time.Sleep(15 * time.Millisecond)
+	require.False(t, indirectAckHandlerExists(m, 1))
+}
+
+func TestPing_InvokeAckHandler(t *testing.T) {
+	m := newPingManager(nil)
+
+	m.invokeAckHandler(ack{}, time.Now()) // does nothing
+
+	ch := make(chan timedAck, 1)
+	m.setAckHandler(1, ch, 10*time.Millisecond)
+
+	ts := time.Now()
+	p := []byte("payload")
+	m.invokeAckHandler(ack{1, p}, ts)
+	require.Equal(t, 1, len(ch))
+	a := <-ch
+	require.Equal(t, ts, a.timestamp)
+	require.True(t, bytes.Equal(a.payload, p))
+}
+
+func TestPing_InvokeIndirectAckHandler(t *testing.T) {
+	m := newPingManager(nil)
+	ch := make(chan struct{}, 1)
+	var nack int32
+
+	m.setIndirectAckHandler(1, ch, &nack, 10*time.Millisecond)
+	m.invokeIndirectAckHandler(indirectAck{1, false}) // nack
+	m.invokeIndirectAckHandler(indirectAck{1, true})  // success
+
+	require.Equal(t, 1, int(nack))
+	require.Equal(t, 1, len(ch))
 }
 
 func TestPing(t *testing.T) {
