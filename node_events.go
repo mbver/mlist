@@ -1,5 +1,11 @@
 package memberlist
 
+import (
+	"fmt"
+	"log"
+	"time"
+)
+
 type NodeEventType int
 
 const (
@@ -26,23 +32,41 @@ type NodeEvent struct {
 }
 
 type EventManager struct {
-	ch chan<- *NodeEvent
+	ch      chan<- *NodeEvent
+	timeout time.Duration
+	logger  *log.Logger
 }
 
 func (mng *EventManager) NotifyJoin(n *Node) {
-	if mng.ch != nil {
-		mng.ch <- &NodeEvent{NodeJoin, n}
+	if err := mng.send(&NodeEvent{NodeJoin, n}); err != nil {
+		mng.logger.Printf("error sending event %s", err)
 	}
 }
 
 func (mng *EventManager) NotifyLeave(n *Node) {
-	if mng.ch != nil {
-		mng.ch <- &NodeEvent{NodeLeave, n}
+	if err := mng.send(&NodeEvent{NodeLeave, n}); err != nil {
+		mng.logger.Printf("error sending event %s", err)
 	}
 }
 
 func (mng *EventManager) NotifyUpdate(n *Node) {
-	if mng.ch != nil {
-		mng.ch <- &NodeEvent{NodeUpdate, n}
+	if err := mng.send(&NodeEvent{NodeUpdate, n}); err != nil {
+		mng.logger.Printf("error sending event %s", err)
 	}
+}
+
+func (mng *EventManager) send(e *NodeEvent) error {
+	if mng.ch == nil {
+		return nil
+	}
+	timeout := mng.timeout
+	if timeout == 0 {
+		timeout = 5 * time.Second
+	}
+	select {
+	case mng.ch <- e:
+	case <-time.After(timeout):
+		return fmt.Errorf("timeout sending event")
+	}
+	return nil
 }

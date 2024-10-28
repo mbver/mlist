@@ -16,6 +16,20 @@ const (
 	StateLeft
 )
 
+func (t StateType) String() string {
+	switch t {
+	case StateAlive:
+		return "alive"
+	case StateSuspect:
+		return "suspect"
+	case StateDead:
+		return "dead"
+	case StateLeft:
+		return "left"
+	}
+	return "unknown state"
+}
+
 type Node struct {
 	ID   string
 	IP   net.IP

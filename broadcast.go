@@ -68,7 +68,9 @@ func (q *TransmitCapQueue) GetMessages(overhead, size int) [][]byte {
 	)
 	var item *TransmitCapItem
 	for {
-		// TODO: has a minimum threshold to avoid popping all the msgs!
+		if bytesUsed+20+overhead > size { // minimum threshold. 20 is minimum deadMsg size
+			break
+		}
 		item = q.Pop()
 		if item == nil {
 			break

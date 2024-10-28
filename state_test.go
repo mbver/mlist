@@ -114,6 +114,68 @@ func TestMemberlist_DeadNode(t *testing.T) {
 	require.Nil(t, checkMsgInQueue(m.mbroadcasts, "test", deadMsg, 1))
 }
 
+func TestMemberlist_DeadNode_LeftRejoin(t *testing.T) {
+	eventCh := make(chan *NodeEvent, 2) // event join and update
+	m, cleanup, err := nodeWithEventChNoSchedule(eventCh)
+	defer cleanup()
+	require.Nil(t, err)
+
+	a := alive{
+		Lives: 1,
+		ID:    "test",
+		IP:    []byte{127, 0, 0, 1},
+		Port:  8000,
+	}
+
+	m.aliveNode(&a, nil)
+	require.Nil(t, checkEventInCh(eventCh, NodeJoin, "test"))
+
+	d := dead{
+		Lives: 1,
+		ID:    "test",
+		Left:  true,
+	}
+
+	m.deadNode(&d, nil)
+
+	node := m.GetNodeState("test")
+	require.Equal(t, StateLeft, node.State)
+
+	require.Nil(t, checkEventInCh(eventCh, NodeLeave, "test"))
+	require.Nil(t, checkMsgInQueue(m.mbroadcasts, "test", deadMsg, 1))
+	a = alive{
+		Lives: 2,
+		ID:    "test",
+		IP:    []byte{127, 0, 0, 1},
+		Port:  8000,
+		Tags:  []byte("new tag"),
+	}
+	m.aliveNode(&a, nil)
+	node = m.GetNodeState("test")
+	require.Equal(t, StateAlive, node.State)
+	require.Equal(t, 2, int(node.Lives))
+
+	require.Nil(t, checkEventInCh(eventCh, NodeJoin, "test"))
+	require.Nil(t, checkEventInCh(eventCh, NodeUpdate, "test"))
+	require.Nil(t, checkMsgInQueue(m.mbroadcasts, "test", aliveMsg, 2))
+}
+
+func TestMemberlist_DeadNode_NoNode(t *testing.T) {
+	eventCh := make(chan *NodeEvent, 2) // event join and update
+	m, cleanup, err := nodeWithEventChNoSchedule(eventCh)
+	defer cleanup()
+	require.Nil(t, err)
+
+	d := dead{
+		Lives: 1,
+		ID:    "test",
+		Left:  true,
+	}
+
+	m.deadNode(&d, nil)
+	require.Nil(t, m.GetNodeState("test"))
+	require.NotNil(t, checkEventInCh(eventCh, NodeLeave, "test"))
+}
 func TestMemberlist_DeadNode_AlreadyDead(t *testing.T) {
 	eventCh := make(chan *NodeEvent, 1)
 	m, cleanup, err := nodeWithEventChNoSchedule(eventCh)

@@ -135,10 +135,14 @@ func (b *MemberlistBuilder) Build() (*Memberlist, error) {
 		usrMsgCh:    b.usrMsgCh,
 		longRunMng:  newLongRunMsgManager(b.config.MaxLongRunQueueDepth),
 		pingMng:     newPingManager(b.pingDelegate),
-		eventMng:    &EventManager{b.eventCh},
-		nodeMap:     map[string]*nodeState{},
-		suspicions:  map[string]*suspicion{},
-		probeIdx:    -1,
+		eventMng: &EventManager{
+			ch:      b.eventCh,
+			timeout: b.config.EventTimeout,
+			logger:  b.logger,
+		},
+		nodeMap:    map[string]*nodeState{},
+		suspicions: map[string]*suspicion{},
+		probeIdx:   -1,
 	}
 	m.mbroadcasts = NewBroadcastQueue(m.getNumNodes, m.config.RetransmitMult)
 
