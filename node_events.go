@@ -1,7 +1,6 @@
 package memberlist
 
 import (
-	"fmt"
 	"log"
 	"time"
 )
@@ -38,26 +37,20 @@ type EventManager struct {
 }
 
 func (mng *EventManager) NotifyJoin(n *Node) {
-	if err := mng.send(&NodeEvent{NodeJoin, n}); err != nil {
-		mng.logger.Printf("error sending event %s", err)
-	}
+	mng.send(&NodeEvent{NodeJoin, n})
 }
 
 func (mng *EventManager) NotifyLeave(n *Node) {
-	if err := mng.send(&NodeEvent{NodeLeave, n}); err != nil {
-		mng.logger.Printf("error sending event %s", err)
-	}
+	mng.send(&NodeEvent{NodeLeave, n})
 }
 
 func (mng *EventManager) NotifyUpdate(n *Node) {
-	if err := mng.send(&NodeEvent{NodeUpdate, n}); err != nil {
-		mng.logger.Printf("error sending event %s", err)
-	}
+	mng.send(&NodeEvent{NodeUpdate, n})
 }
 
-func (mng *EventManager) send(e *NodeEvent) error {
+func (mng *EventManager) send(e *NodeEvent) {
 	if mng.ch == nil {
-		return nil
+		return
 	}
 	timeout := mng.timeout
 	if timeout == 0 {
@@ -66,7 +59,6 @@ func (mng *EventManager) send(e *NodeEvent) error {
 	select {
 	case mng.ch <- e:
 	case <-time.After(timeout):
-		return fmt.Errorf("timeout sending event")
+		mng.logger.Printf("[ERR] memberlist: Failed to send event")
 	}
-	return nil
 }

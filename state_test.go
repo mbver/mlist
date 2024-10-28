@@ -14,6 +14,7 @@ func nodeWithEventChNoSchedule(ch chan *NodeEvent) (*Memberlist, func(), error) 
 		return nil, cleanup, err
 	}
 	m.eventMng.ch = ch
+	m.eventMng.logger = m.logger
 	return m, cleanup, err
 }
 
