@@ -185,7 +185,26 @@ func TestMemberlist_GossipToDead(t *testing.T) {
 	require.True(t, success, msg)
 }
 
-func TestProbeNode(t *testing.T) {}
+func TestProbeNode(t *testing.T) {
+	m1, m2, cleanup, err := twoNodesNoSchedule()
+	m1.config.ProbeInterval = 2 * time.Second // for suspect timeout
+	defer cleanup()
+	require.Nil(t, err)
+
+	joinAndTest(t, m1, m2)
+
+	node := m2.LocalNodeState()
+	m1.probeNode(node)
+
+	node = m1.GetNodeState(m2.config.ID)
+	require.Equal(t, StateAlive, node.State)
+
+	m2.Shutdown()
+
+	m1.probeNode(node)
+	node = m1.GetNodeState(m2.config.ID)
+	require.Equal(t, StateSuspect, node.State)
+}
 
 func TestMemberlist_Reap(t *testing.T) {
 	m, cleanup, err := newTestMemberlistNoSchedule()
