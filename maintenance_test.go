@@ -185,7 +185,7 @@ func TestMemberlist_GossipToDead(t *testing.T) {
 	require.True(t, success, msg)
 }
 
-func TestProbeNode(t *testing.T) {
+func TestMemberlist_ProbeNode(t *testing.T) {
 	m1, m2, cleanup, err := twoNodesNoSchedule()
 	m1.config.ProbeInterval = 2 * time.Second // for suspect timeout
 	defer cleanup()
@@ -193,7 +193,7 @@ func TestProbeNode(t *testing.T) {
 
 	joinAndTest(t, m1, m2)
 
-	node := m2.LocalNodeState()
+	node := m1.GetNodeState(m2.config.ID)
 	m1.probeNode(node)
 
 	node = m1.GetNodeState(m2.config.ID)
@@ -204,6 +204,41 @@ func TestProbeNode(t *testing.T) {
 	m1.probeNode(node)
 	node = m1.GetNodeState(m2.config.ID)
 	require.Equal(t, StateSuspect, node.State)
+}
+
+func TestMemberlist_ProbeNode_Buddy(t *testing.T) {
+	m1, m2, cleanup, err := twoNodesNoSchedule()
+	m1.config.ProbeInterval = 2 * time.Second // for suspect timeout
+	defer cleanup()
+	require.Nil(t, err)
+
+	joinAndTest(t, m1, m2)
+
+	// fake a suspect
+	m1.nodeL.Lock()
+	m1.nodeMap[m2.config.ID].State = StateSuspect
+	m1.nodeL.Unlock()
+
+	node := m1.GetNodeState(m2.config.ID)
+	m1.probeNode(node)
+
+	require.Equal(t, 1, m2.awr.GetHealth()) // should be punished
+	node = m2.LocalNodeState()
+	require.Equal(t, 2, int(node.Lives))
+
+	success, msg := retry(5, func() (bool, string) {
+		m2.gossip()
+		time.Sleep(10 * time.Millisecond)
+		node = m1.GetNodeState(m2.config.ID)
+		if node.State != StateAlive {
+			return false, "wrong state"
+		}
+		if node.Lives != 2 {
+			return false, "wrong lives"
+		}
+		return true, ""
+	})
+	require.True(t, success, msg)
 }
 
 func TestMemberlist_Reap(t *testing.T) {
