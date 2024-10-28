@@ -79,16 +79,23 @@ func TestMemberlist_PushPull(t *testing.T) {
 			return false, "expect 5 nodes"
 		}
 		nodes := m2.ActiveNodes()
-		sortNodes(nodes)
-		for i := 0; i < 3; i++ {
-			if nodes[i+2].ID != fmt.Sprintf("Test %d", i) {
-				return false, "wrong node id"
+		found := make([]bool, 3)
+		for i := range found {
+			for _, n := range nodes {
+				if n.ID == fmt.Sprintf("Test %d", i) {
+					if n.IP.String() != m1.config.BindAddr {
+						continue
+					}
+					if n.Port != uint16(m1.config.BindPort) {
+						continue
+					}
+					found[i] = true
+				}
 			}
-			if nodes[i+2].IP.String() != m1.config.BindAddr {
-				return false, "wrong node ip"
-			}
-			if nodes[i+2].Port != uint16(m1.config.BindPort) {
-				return false, "wrong node port"
+		}
+		for i, v := range found {
+			if !v {
+				return false, fmt.Sprintf("not found %d", i)
 			}
 		}
 		return true, ""
@@ -176,7 +183,7 @@ func TestMemberlist_GossipToDead(t *testing.T) {
 		}
 		nodes := m2.ActiveNodes()
 		for _, n := range nodes {
-			if n.ID == m2.config.ID && n.IP.String() == m2.config.BindAddr {
+			if n.ID == m2.ID() && n.IP.String() == m2.config.BindAddr {
 				return true, ""
 			}
 		}
@@ -193,16 +200,16 @@ func TestMemberlist_ProbeNode(t *testing.T) {
 
 	joinAndTest(t, m1, m2)
 
-	node := m1.GetNodeState(m2.config.ID)
+	node := m1.GetNodeState(m2.ID())
 	m1.probeNode(node)
 
-	node = m1.GetNodeState(m2.config.ID)
+	node = m1.GetNodeState(m2.ID())
 	require.Equal(t, StateAlive, node.State)
 
 	m2.Shutdown()
 
 	m1.probeNode(node)
-	node = m1.GetNodeState(m2.config.ID)
+	node = m1.GetNodeState(m2.ID())
 	require.Equal(t, StateSuspect, node.State)
 }
 
@@ -216,10 +223,10 @@ func TestMemberlist_ProbeNode_Buddy(t *testing.T) {
 
 	// fake a suspect
 	m1.nodeL.Lock()
-	m1.nodeMap[m2.config.ID].State = StateSuspect
+	m1.nodeMap[m2.ID()].State = StateSuspect
 	m1.nodeL.Unlock()
 
-	node := m1.GetNodeState(m2.config.ID)
+	node := m1.GetNodeState(m2.ID())
 	m1.probeNode(node)
 
 	require.Equal(t, 1, m2.awr.GetHealth()) // should be punished
@@ -229,7 +236,7 @@ func TestMemberlist_ProbeNode_Buddy(t *testing.T) {
 	success, msg := retry(5, func() (bool, string) {
 		m2.gossip()
 		time.Sleep(10 * time.Millisecond)
-		node = m1.GetNodeState(m2.config.ID)
+		node = m1.GetNodeState(m2.ID())
 		if node.State != StateAlive {
 			return false, "wrong state"
 		}

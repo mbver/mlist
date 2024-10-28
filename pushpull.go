@@ -39,7 +39,7 @@ func pushPullScale(interval time.Duration, n int) time.Duration {
 func (m *Memberlist) pushPull() {
 	// choose a node to
 	nodes := m.pickRandomNodes(1, func(n *nodeState) bool {
-		return n.Node.ID != m.config.ID && n.State == StateAlive
+		return n.Node.ID != m.ID() && n.State == StateAlive
 	})
 
 	if len(nodes) == 0 {
@@ -190,7 +190,7 @@ func (m *Memberlist) mergeState(remote []stateToMerge) {
 		case StateDead: // prefer suspect
 			fallthrough
 		case StateSuspect:
-			s := suspect{Lives: r.Lives, ID: r.ID, From: m.config.ID}
+			s := suspect{Lives: r.Lives, ID: r.ID, From: m.ID()}
 			m.suspectNode(&s)
 		}
 	}

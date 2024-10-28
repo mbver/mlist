@@ -172,7 +172,7 @@ func (m *Memberlist) Ping(node *nodeState, timeout time.Duration) bool {
 			return false
 		}
 	} else { // state suspect, apply buddy mechanism so it can refute asap
-		s := suspect{Lives: node.Lives, ID: node.Node.ID, From: m.config.ID}
+		s := suspect{Lives: node.Lives, ID: node.Node.ID, From: m.ID()}
 		msg, err := buddyPingMsg(p, s)
 		if err != nil {
 			// log err
@@ -214,7 +214,7 @@ func (m *Memberlist) IndirectPing(node *nodeState, timeout time.Duration) chan i
 		}
 
 		peers := m.pickRandomNodes(m.config.NumIndirectChecks, func(n *nodeState) bool {
-			return n.Node.ID != m.config.ID &&
+			return n.Node.ID != m.ID() &&
 				n.Node.ID != node.Node.ID &&
 				n.State == StateAlive
 		})

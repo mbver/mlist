@@ -149,7 +149,7 @@ func (m *Memberlist) handlePing(buf []byte, from *net.UDPAddr) {
 	}
 
 	// If node is provided, verify that it is for us
-	if p.ID != "" && p.ID != m.config.ID {
+	if p.ID != "" && p.ID != m.ID() {
 		m.logger.Printf("[WARN] memberlist: Got ping for unexpected node '%s' from %s", p.ID, from)
 		return
 	}
@@ -408,7 +408,7 @@ func (m *Memberlist) handlePingTcp(dec *codec.Decoder, conn net.Conn, streamLabe
 		return
 	}
 
-	if p.ID != "" && p.ID != m.config.ID {
+	if p.ID != "" && p.ID != m.ID() {
 		m.logger.Printf("[WARN] memberlist: Got ping for unexpected node %s from %s", p.ID, conn.RemoteAddr())
 		return
 	}

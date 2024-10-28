@@ -123,7 +123,7 @@ func (b *MemberlistBuilder) Build() (*Memberlist, error) {
 			return nil, err
 		}
 	}
-
+	b.config.ID = UniqueID() // make sure ID is unique so all the messy conflicts will not happen
 	m := &Memberlist{
 		awr:         newAwareness(b.config.MaxAwarenessHealth),
 		config:      b.config,
@@ -204,7 +204,7 @@ func (m *Memberlist) setAlive() error {
 	}
 	a := alive{
 		Lives: m.nextLiveNo(),
-		ID:    m.config.ID,
+		ID:    m.ID(),
 		IP:    addr,
 		Port:  port,
 		Tags:  m.config.Tags,
@@ -257,7 +257,7 @@ func (m *Memberlist) Leave() error {
 	atomic.StoreInt32(&m.left, 1)
 
 	m.nodeL.Lock()
-	node, ok := m.nodeMap[m.config.ID]
+	node, ok := m.nodeMap[m.ID()]
 	m.nodeL.Unlock()
 	if !ok {
 		m.logger.Printf("[WARN] memberlist: Leave but we're not in the node map.")
@@ -285,12 +285,12 @@ func (m *Memberlist) Leave() error {
 func (m *Memberlist) UpdateTags(tags []byte) error {
 	// Get the existing node
 	m.nodeL.RLock()
-	node := m.nodeMap[m.config.ID]
+	node := m.nodeMap[m.ID()]
 	m.nodeL.RUnlock()
 
 	a := alive{
 		Lives: m.nextLiveNo(),
-		ID:    m.config.ID,
+		ID:    m.ID(),
 		IP:    node.Node.IP,
 		Port:  node.Node.Port,
 		Tags:  tags,
@@ -370,5 +370,13 @@ func (m *Memberlist) GetNodeState(id string) *nodeState {
 }
 
 func (m *Memberlist) LocalNodeState() *nodeState {
-	return m.GetNodeState(m.config.ID)
+	return m.GetNodeState(m.ID())
+}
+
+func (m *Memberlist) ID() string {
+	return m.config.ID
+}
+
+func (m *Memberlist) Health() int {
+	return m.awr.GetHealth()
 }

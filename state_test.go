@@ -284,7 +284,7 @@ func TestMemberlist_SuspectNode_Refute(t *testing.T) {
 
 	s := suspect{
 		Lives: 1,
-		ID:    m.config.ID,
+		ID:    m.ID(),
 		From:  "some node",
 	}
 	m.suspectNode(&s)
@@ -292,7 +292,7 @@ func TestMemberlist_SuspectNode_Refute(t *testing.T) {
 	require.Equal(t, 2, int(node.Lives))
 	require.Equal(t, StateAlive, node.State)
 	require.Equal(t, 1, m.awr.GetHealth()) // should be punish
-	require.Nil(t, checkMsgInQueue(m.mbroadcasts, m.config.ID, aliveMsg, 2))
+	require.Nil(t, checkMsgInQueue(m.mbroadcasts, m.ID(), aliveMsg, 2))
 }
 
 func TestMemberlist_DeadNode(t *testing.T) {
@@ -461,7 +461,7 @@ func TestMemberlist_DeadNodeRefute(t *testing.T) {
 
 	require.Equal(t, 0, m.awr.GetHealth())
 	d := dead{
-		ID:    m.config.ID,
+		ID:    m.ID(),
 		Lives: 1,
 	}
 
@@ -474,5 +474,5 @@ func TestMemberlist_DeadNodeRefute(t *testing.T) {
 
 	require.Equal(t, 1, m.awr.GetHealth()) // should be punished
 
-	require.Nil(t, checkMsgInQueue(m.mbroadcasts, m.config.ID, aliveMsg, 2))
+	require.Nil(t, checkMsgInQueue(m.mbroadcasts, m.ID(), aliveMsg, 2))
 }

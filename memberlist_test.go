@@ -49,12 +49,16 @@ func newTestMemberlist(ip net.IP, port int, conf *Config) (*Memberlist, func(), 
 		ip, cleanup = testaddr.BindAddrs.NextAvailAddr()
 	}
 	conf.BindAddr = ip.String()
-	conf.ID = conf.BindAddr
 	if port != 0 {
 		conf.BindPort = port
-		conf.ID = fmt.Sprintf("%s:%d", conf.BindAddr, conf.BindPort)
 	}
-	logger := log.New(os.Stderr, "mtest-"+conf.ID+": ", log.LstdFlags)
+
+	prefix := fmt.Sprintf("mtest-%s: ", conf.BindAddr) // don't need to log default port
+	if port != 0 {
+		prefix = fmt.Sprintf("mtest-%s:%d: ", conf.BindAddr, port)
+	}
+	logger := log.New(os.Stderr, prefix, log.LstdFlags)
+
 	b.WithLogger(logger)
 	b.WithConfig(conf)
 	m, err := b.Build()
@@ -115,7 +119,7 @@ func TestMemberlist_Create(t *testing.T) {
 	}
 	require.Nil(t, err)
 	require.Equal(t, m.NumActive(), 1)
-	require.Equal(t, m.ActiveNodes()[0].ID, m.config.ID)
+	require.Equal(t, m.ActiveNodes()[0].ID, m.ID())
 }
 
 func sortNodes(nodes []*Node) {
@@ -318,10 +322,10 @@ func TestMemberlist_Leave(t *testing.T) {
 		if m1.NumActive() != 1 || m2.NumActive() != 1 {
 			return false
 		}
-		if m1.GetNodeState(m2.config.ID).State != StateLeft {
+		if m1.GetNodeState(m2.ID()).State != StateLeft {
 			return false
 		}
-		if m2.GetNodeState(m2.config.ID).State != StateLeft {
+		if m2.GetNodeState(m2.ID()).State != StateLeft {
 			return false
 		}
 		return true
@@ -345,16 +349,16 @@ func TestMemberlist_UpdateTags(t *testing.T) {
 		if m1.NumActive() != 2 || m2.NumActive() != 2 {
 			return false
 		}
-		if !bytes.Equal(m1.GetNodeState(m1.config.ID).Node.Tags, role1) {
+		if !bytes.Equal(m1.GetNodeState(m1.ID()).Node.Tags, role1) {
 			return false
 		}
-		if !bytes.Equal(m1.GetNodeState(m2.config.ID).Node.Tags, role2) {
+		if !bytes.Equal(m1.GetNodeState(m2.ID()).Node.Tags, role2) {
 			return false
 		}
-		if !bytes.Equal(m2.GetNodeState(m1.config.ID).Node.Tags, role1) {
+		if !bytes.Equal(m2.GetNodeState(m1.ID()).Node.Tags, role1) {
 			return false
 		}
-		if !bytes.Equal(m2.GetNodeState(m2.config.ID).Node.Tags, role2) {
+		if !bytes.Equal(m2.GetNodeState(m2.ID()).Node.Tags, role2) {
 			return false
 		}
 		return true

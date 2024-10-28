@@ -98,7 +98,7 @@ func (m *Memberlist) nextLiveNo() uint32 {
 }
 
 func (m *Memberlist) aliveNode(a *alive, notify chan struct{}) {
-	isLocalNode := a.ID == m.config.ID
+	isLocalNode := a.ID == m.ID()
 	if m.hasLeft() && isLocalNode {
 		return
 	}
@@ -202,7 +202,7 @@ func (m *Memberlist) suspectNode(s *suspect) {
 	}
 
 	// If this is us we need to refute
-	if s.ID == m.config.ID {
+	if s.ID == m.ID() {
 		m.refute(node, s.Lives)
 		// m.logger.Printf("[WARN] memberlist: Refuting a suspect message")
 		return
@@ -275,7 +275,7 @@ func (m *Memberlist) deadNode(d *dead, notify chan struct{}) {
 		return
 	}
 
-	isLocalNode := d.ID == m.config.ID
+	isLocalNode := d.ID == m.ID()
 	// if this is us & still active, refute
 	if isLocalNode && !m.hasLeft() {
 		m.refute(node, d.Lives)

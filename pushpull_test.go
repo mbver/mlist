@@ -105,7 +105,7 @@ func TestPushPull_SendReceive(t *testing.T) {
 	require.Equal(t, 1, len(remoteNodes))
 
 	node := remoteNodes[0]
-	require.Equal(t, node.ID, m1.config.ID)
+	require.Equal(t, node.ID, m1.ID())
 	if node.IP.String() != m1.config.BindAddr {
 		t.Fatalf("unmatched ip: expect: %s, got: %s", m1.config.BindAddr, node.IP)
 	}
@@ -113,10 +113,21 @@ func TestPushPull_SendReceive(t *testing.T) {
 
 	require.Equal(t, 4, m1.NumActive())
 	nodes := m1.ActiveNodes()
-	sortNodes(nodes)
-	for i := 0; i < 3; i++ {
-		require.Equal(t, fmt.Sprintf("Test %d", i), nodes[i+1].ID)
-		require.Equal(t, m1.config.BindAddr, nodes[i+1].IP.String())
-		require.Equal(t, m1.config.BindPort, int(nodes[i+1].Port))
+	found := make([]bool, 3)
+	for i := range found {
+		for _, n := range nodes {
+			if n.ID == fmt.Sprintf("Test %d", i) {
+				if n.IP.String() != m1.config.BindAddr {
+					continue
+				}
+				if n.Port != uint16(m1.config.BindPort) {
+					continue
+				}
+				found[i] = true
+			}
+		}
+	}
+	for i, v := range found {
+		require.True(t, v, fmt.Sprintf("not found %d", i))
 	}
 }

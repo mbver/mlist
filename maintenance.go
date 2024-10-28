@@ -56,7 +56,7 @@ func (m *Memberlist) scheduleFuncWithScale(interval time.Duration, stopCh chan s
 func (m *Memberlist) gossip() {
 	// Get some random live, suspect, or unexpired nodes
 	nodes := m.pickRandomNodes(m.config.GossipNodes, func(n *nodeState) bool {
-		return n.Node.ID != m.config.ID &&
+		return n.Node.ID != m.ID() &&
 			(n.State != StateDead ||
 				(n.State == StateDead && time.Since(n.StateChange) <= m.config.DeadNodeExpiredTimeout))
 	})
@@ -132,7 +132,7 @@ func (m *Memberlist) nextProbeNode() (*nodeState, error) {
 	}
 	for m.probeIdx < len(m.nodes) {
 		node := m.nodes[m.probeIdx]
-		if node.Node.ID == m.config.ID || node.DeadOrLeft() {
+		if node.Node.ID == m.ID() || node.DeadOrLeft() {
 			m.probeIdx++
 			continue
 		}
@@ -181,7 +181,7 @@ WAIT:
 	missedNacks := indirectRes.numNode - indirectRes.nNacks
 	m.awr.Punish(missedNacks)
 	m.logger.Printf("[INFO] memberlist: Suspect %s has failed, no acks received", node.Node.ID)
-	s := suspect{Lives: node.Lives, ID: node.Node.ID, From: m.config.ID}
+	s := suspect{Lives: node.Lives, ID: node.Node.ID, From: m.ID()}
 	m.suspectNode(&s)
 }
 
