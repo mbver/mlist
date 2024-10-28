@@ -229,7 +229,7 @@ func TestMemberlist_ProbeNode_Buddy(t *testing.T) {
 	node := m1.GetNodeState(m2.ID())
 	m1.probeNode(node)
 
-	require.Equal(t, 1, m2.awr.GetHealth()) // should be punished
+	require.Equal(t, 1, m2.Health()) // should be punished
 	node = m2.LocalNodeState()
 	require.Equal(t, 2, int(node.Lives))
 

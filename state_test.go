@@ -280,7 +280,7 @@ func TestMemberlist_SuspectNode_Refute(t *testing.T) {
 	defer cleanup()
 	require.Nil(t, err)
 
-	require.Zero(t, m.awr.GetHealth())
+	require.Zero(t, m.Health())
 
 	s := suspect{
 		Lives: 1,
@@ -291,7 +291,7 @@ func TestMemberlist_SuspectNode_Refute(t *testing.T) {
 	node := m.LocalNodeState()
 	require.Equal(t, 2, int(node.Lives))
 	require.Equal(t, StateAlive, node.State)
-	require.Equal(t, 1, m.awr.GetHealth()) // should be punish
+	require.Equal(t, 1, m.Health()) // should be punish
 	require.Nil(t, checkMsgInQueue(m.mbroadcasts, m.ID(), aliveMsg, 2))
 }
 
@@ -459,7 +459,7 @@ func TestMemberlist_DeadNodeRefute(t *testing.T) {
 	defer cleanup()
 	require.Nil(t, err)
 
-	require.Equal(t, 0, m.awr.GetHealth())
+	require.Equal(t, 0, m.Health())
 	d := dead{
 		ID:    m.ID(),
 		Lives: 1,
@@ -472,7 +472,7 @@ func TestMemberlist_DeadNodeRefute(t *testing.T) {
 	require.Equal(t, StateAlive, node.State)
 	require.Equal(t, 2, int(node.Lives))
 
-	require.Equal(t, 1, m.awr.GetHealth()) // should be punished
+	require.Equal(t, 1, m.Health()) // should be punished
 
 	require.Nil(t, checkMsgInQueue(m.mbroadcasts, m.ID(), aliveMsg, 2))
 }
