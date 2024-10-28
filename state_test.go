@@ -84,7 +84,7 @@ func checkEventInCh(ch chan *NodeEvent, t NodeEventType, id string) error {
 }
 
 func prepareTestNode() (*Memberlist, chan *NodeEvent, func(), error) {
-	eventCh := make(chan *NodeEvent, 2)
+	eventCh := make(chan *NodeEvent, 2) // update event and join event
 	m, cleanup, err := nodeWithEventChNoSchedule(eventCh)
 	if err != nil {
 		return nil, nil, cleanup, err
@@ -98,6 +98,91 @@ func prepareTestNode() (*Memberlist, chan *NodeEvent, func(), error) {
 	}
 	m.aliveNode(&a, nil)
 	return m, eventCh, cleanup, checkEventInCh(eventCh, NodeJoin, "test")
+}
+
+func isRecent(t1 time.Time) bool {
+	return t1.After(time.Now().Add(-1 * time.Second))
+}
+
+func TestMemberlist_AliveNode_NewNode(t *testing.T) {
+	m, _, cleanup, err := prepareTestNode()
+	defer cleanup()
+	require.Nil(t, err)
+
+	node := m.GetNodeState("test")
+	require.Equal(t, 1, int(node.Lives))
+	require.Equal(t, StateAlive, node.State)
+	require.True(t, isRecent(node.StateChange))
+}
+
+func TestMemberlist_AliveNode_SuspectNode(t *testing.T) {
+	m, eventCh, cleanup, err := prepareTestNode()
+	defer cleanup()
+	require.Nil(t, err)
+
+	// fake suspect, without creating a suspect timer
+	m.nodeL.Lock()
+	m.nodeMap["test"].State = StateSuspect
+	m.nodeMap["test"].StateChange = time.Now().Add(-1 * time.Hour)
+	m.nodeL.Unlock()
+
+	a := alive{
+		Lives: 1,
+		ID:    "test",
+		IP:    []byte{127, 0, 0, 1},
+		Port:  7946,
+	}
+	m.aliveNode(&a, nil)
+	node := m.GetNodeState("test")
+	require.Equal(t, StateSuspect, node.State)
+
+	a.Lives = 2
+	m.aliveNode(&a, nil)
+	node = m.GetNodeState("test")
+	require.Equal(t, StateAlive, node.State)
+	require.True(t, isRecent(node.StateChange))
+	require.Zero(t, len(eventCh))
+	require.Nil(t, checkMsgInQueue(m.mbroadcasts, "test", aliveMsg, 2)) // no event
+}
+
+func TestMemberlist_AliveNode_Idempotent(t *testing.T) {
+	m, _, cleanup, err := prepareTestNode()
+	defer cleanup()
+	require.Nil(t, err)
+	node0 := m.GetNodeState("test")
+	a := alive{
+		Lives: 2,
+		ID:    "test",
+		IP:    []byte{127, 0, 0, 1},
+		Port:  7946,
+	}
+	m.aliveNode(&a, nil)
+	node1 := m.GetNodeState("test")
+	require.Equal(t, StateAlive, node1.State)
+	require.Equal(t, node0.StateChange, node1.StateChange)
+	require.Nil(t, checkMsgInQueue(m.mbroadcasts, "test", aliveMsg, 2))
+}
+
+func TestMemberlist_AliveNode_Update(t *testing.T) {
+	m, eventCh, cleanup, err := prepareTestNode()
+	defer cleanup()
+	require.Nil(t, err)
+
+	a := alive{
+		Lives: 2,
+		ID:    "test",
+		IP:    []byte{127, 0, 0, 1},
+		Port:  7946,
+		Tags:  []byte("new tag"),
+	}
+	m.aliveNode(&a, nil)
+	node := m.GetNodeState("test")
+	require.Equal(t, 2, int(node.Lives))
+	if !bytes.Equal(a.Tags, node.Node.Tags) {
+		t.Fatalf("tags not updated")
+	}
+	require.Nil(t, checkEventInCh(eventCh, NodeUpdate, "test"))
+	require.Nil(t, checkMsgInQueue(m.mbroadcasts, "test", aliveMsg, 2))
 }
 
 func TestMemberlist_SuspectNode(t *testing.T) {
@@ -119,7 +204,7 @@ func TestMemberlist_SuspectNode(t *testing.T) {
 	node := m.GetNodeState("test")
 	require.Equal(t, StateSuspect, node.State)
 	change := node.StateChange
-	require.True(t, change.After(time.Now().Add(-1*time.Second)))
+	require.True(t, isRecent(change))
 	require.Nil(t, checkMsgInQueue(m.mbroadcasts, "test", suspectMsg, 1))
 
 	time.Sleep(10 * time.Millisecond) // wait for suspicion timeout
@@ -148,7 +233,7 @@ func TestMemberlist_SuspectNode_DoubleSuspect(t *testing.T) {
 	node := m.GetNodeState("test")
 	require.Equal(t, StateSuspect, node.State)
 	change := node.StateChange
-	require.True(t, change.After(time.Now().Add(-1*time.Second)))
+	require.True(t, isRecent(change))
 
 	m.suspectNode(&s)
 	node = m.GetNodeState("test")
@@ -286,7 +371,7 @@ func TestMemberlist_DeadNode_NoNode(t *testing.T) {
 
 	m.deadNode(&d, nil)
 	require.Nil(t, m.GetNodeState("test"))
-	require.NotNil(t, checkEventInCh(eventCh, NodeLeave, "test"))
+	require.Zero(t, len(eventCh)) // no event
 }
 func TestMemberlist_DeadNode_AlreadyDead(t *testing.T) {
 	m, eventCh, cleanup, err := prepareTestNode()
@@ -303,7 +388,7 @@ func TestMemberlist_DeadNode_AlreadyDead(t *testing.T) {
 
 	d.Lives = 2
 	m.deadNode(&d, nil)
-	require.NotNil(t, checkEventInCh(eventCh, NodeLeave, "test"))
+	require.Zero(t, len(eventCh)) // no event
 
 	node := m.GetNodeState("test")
 	require.Equal(t, StateDead, node.State)
@@ -331,7 +416,7 @@ func TestMemberlist_DeadNode_OldDead(t *testing.T) {
 		ID:    "test",
 	}
 	m.deadNode(&d, nil)
-	require.NotNil(t, checkEventInCh(eventCh, NodeLeave, "test"))
+	require.Zero(t, len(eventCh)) // no event
 
 	node := m.GetNodeState("test")
 	require.Equal(t, StateAlive, node.State)
@@ -381,7 +466,7 @@ func TestMemberlist_DeadNodeRefute(t *testing.T) {
 	}
 
 	m.deadNode(&d, nil)
-	require.NotNil(t, checkEventInCh(eventCh, NodeLeave, d.ID)) // no event
+	require.Zero(t, len(eventCh)) // no event
 
 	node := m.LocalNodeState()
 	require.Equal(t, StateAlive, node.State)
