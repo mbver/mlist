@@ -76,8 +76,8 @@ func TestPing_InvokeIndirectAckHandler(t *testing.T) {
 
 func newTestMemberlistNoSchedule() (*Memberlist, func(), error) {
 	conf := defaultTestConfig()
-	// deactive gossip, probe and pushpull scheduler
-	// so they don't interfere with the ping test
+	// deactivate gossip, probe and pushpull scheduler
+	// so they don't interfere with the test
 	conf.GossipInterval = 0
 	conf.ProbeInterval = 0
 	conf.PushPullInterval = 0
