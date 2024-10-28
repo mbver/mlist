@@ -9,53 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newTestMemberlistNoSchedule() (*Memberlist, func(), error) {
-	conf := defaultTestConfig()
-	// deactive gossip, probe and pushpull scheduler
-	// so they don't interfere with the ping test
-	conf.GossipInterval = 0
-	conf.ProbeInterval = 0
-	conf.PushPullInterval = 0
-	conf.ReapInterval = 0
-	return newTestMemberlist(nil, 0, conf)
-}
-
-func twoNodesNoSchedule() (*Memberlist, *Memberlist, func(), error) {
-	m1, cleanup1, err := newTestMemberlistNoSchedule()
-	if err != nil {
-		return nil, nil, cleanup1, err
-	}
-	m2, cleanup2, err := newTestMemberlistNoSchedule()
-	cleanup := getCleanup(cleanup1, cleanup2)
-	if err != nil {
-		return nil, nil, cleanup, err
-	}
-	return m1, m2, cleanup, nil
-}
-
-func threeNodesNoSchedule() (*Memberlist, *Memberlist, *Memberlist, func(), error) {
-	m1, m2, cleanup1, err := twoNodesNoSchedule()
-	if err != nil {
-		return nil, nil, nil, cleanup1, err
-	}
-	m3, cleanup3, err := newTestMemberlistNoSchedule()
-	cleanup := getCleanup(cleanup1, cleanup3)
-	if err != nil {
-		return nil, nil, nil, cleanup, err
-	}
-	return m1, m2, m3, cleanup, nil
-}
-
-func retry(times int, fn func() (bool, string)) (success bool, msg string) {
-	for i := 0; i < times; i++ {
-		success, msg = fn()
-		if success {
-			return
-		}
-	}
-	return
-}
-
 func ackHandlerExists(m *pingManager, seqNo uint32) bool {
 	m.l.Lock()
 	defer m.l.Unlock()
@@ -113,6 +66,53 @@ func TestPing_InvokeIndirectAckHandler(t *testing.T) {
 
 	require.Equal(t, 1, int(nack))
 	require.Equal(t, 1, len(ch))
+}
+
+func newTestMemberlistNoSchedule() (*Memberlist, func(), error) {
+	conf := defaultTestConfig()
+	// deactive gossip, probe and pushpull scheduler
+	// so they don't interfere with the ping test
+	conf.GossipInterval = 0
+	conf.ProbeInterval = 0
+	conf.PushPullInterval = 0
+	conf.ReapInterval = 0
+	return newTestMemberlist(nil, 0, conf)
+}
+
+func twoNodesNoSchedule() (*Memberlist, *Memberlist, func(), error) {
+	m1, cleanup1, err := newTestMemberlistNoSchedule()
+	if err != nil {
+		return nil, nil, cleanup1, err
+	}
+	m2, cleanup2, err := newTestMemberlistNoSchedule()
+	cleanup := getCleanup(cleanup1, cleanup2)
+	if err != nil {
+		return nil, nil, cleanup, err
+	}
+	return m1, m2, cleanup, nil
+}
+
+func threeNodesNoSchedule() (*Memberlist, *Memberlist, *Memberlist, func(), error) {
+	m1, m2, cleanup1, err := twoNodesNoSchedule()
+	if err != nil {
+		return nil, nil, nil, cleanup1, err
+	}
+	m3, cleanup3, err := newTestMemberlistNoSchedule()
+	cleanup := getCleanup(cleanup1, cleanup3)
+	if err != nil {
+		return nil, nil, nil, cleanup, err
+	}
+	return m1, m2, m3, cleanup, nil
+}
+
+func retry(times int, fn func() (bool, string)) (success bool, msg string) {
+	for i := 0; i < times; i++ {
+		success, msg = fn()
+		if success {
+			return
+		}
+	}
+	return
 }
 
 func TestPing(t *testing.T) {
