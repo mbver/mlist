@@ -9,6 +9,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestPing_SeqNo(t *testing.T) {
+	m := newPingManager(nil)
+	require.Equal(t, 1, int(m.nextSeqNo()))
+	require.Equal(t, 2, int(m.nextSeqNo()))
+}
+
 func ackHandlerExists(m *pingManager, seqNo uint32) bool {
 	m.l.Lock()
 	defer m.l.Unlock()

@@ -186,3 +186,29 @@ func TestMemberlist_GossipToDead(t *testing.T) {
 }
 
 func TestProbeNode(t *testing.T) {}
+
+func TestMemberlist_Reap(t *testing.T) {
+	m, cleanup, err := newTestMemberlistNoSchedule()
+	defer cleanup()
+	require.Nil(t, err)
+
+	for i := 0; i < 3; i++ {
+		a := alive{Lives: 1, ID: fmt.Sprintf("test%d", i), IP: []byte{127, 0, 0, byte(i)}, Port: 7946}
+		m.aliveNode(&a, nil)
+	}
+
+	d := dead{Lives: 1, ID: "test2"}
+	m.deadNode(&d, nil)
+
+	m.reap()
+
+	require.Equal(t, 4, m.getNumNodes())
+
+	m.nodeL.Lock()
+	m.nodeMap["test2"].StateChange = time.Now().Add(-2 * m.config.DeadNodeExpiredTimeout)
+	m.nodeL.Unlock()
+
+	m.reap()
+	require.Equal(t, 3, m.getNumNodes())
+	require.Nil(t, m.GetNodeState("test2"))
+}
