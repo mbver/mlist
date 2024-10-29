@@ -172,7 +172,7 @@ WAIT:
 				success = true
 				break WAIT
 			}
-		case <-time.After(timeout + 10*time.Millisecond):
+		case <-time.After(timeout + m.config.MaxRTT):
 			break WAIT
 		}
 	}

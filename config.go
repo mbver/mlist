@@ -21,6 +21,7 @@ type Config struct {
 	NumIndirectChecks       int
 	PingTimeout             time.Duration
 	ProbeInterval           time.Duration
+	MaxRTT                  time.Duration
 	GossipNodes             int
 	GossipInterval          time.Duration
 	DeadNodeExpiredTimeout  time.Duration
@@ -53,6 +54,7 @@ func DefaultLANConfig() *Config {
 		NumIndirectChecks:       3,
 		PingTimeout:             500 * time.Millisecond,
 		ProbeInterval:           1100 * time.Millisecond, // more than 2 times of PingTimeout so IndirectPing can get Nacks
+		MaxRTT:                  30 * time.Millisecond,
 		GossipNodes:             3,
 		GossipInterval:          200 * time.Millisecond,
 		DeadNodeExpiredTimeout:  30 * time.Second,

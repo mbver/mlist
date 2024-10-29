@@ -246,6 +246,7 @@ func TestMemberlist_NextProbeNode(t *testing.T) {
 func TestMemberlist_ProbeNode(t *testing.T) {
 	m1, m2, cleanup, err := twoNodesNoSchedule()
 	m1.config.ProbeInterval = 2 * time.Second // for suspect timeout
+	probeTimeMax := m1.config.ProbeInterval + m1.config.MaxRTT + 10*time.Millisecond
 	defer cleanup()
 	require.Nil(t, err)
 
@@ -259,9 +260,12 @@ func TestMemberlist_ProbeNode(t *testing.T) {
 
 	m2.Shutdown()
 
+	start := time.Now()
 	m1.probeNode(node)
+	end := time.Now()
 	node = m1.GetNodeState(m2.ID())
 	require.Equal(t, StateSuspect, node.State)
+	require.True(t, end.Before(start.Add(probeTimeMax)))
 }
 
 func TestMemberlist_ProbeNode_Buddy(t *testing.T) {
