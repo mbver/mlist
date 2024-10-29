@@ -73,7 +73,11 @@ func TestMemberlist_PushPull(t *testing.T) {
 		}
 		m1.aliveNode(&a, nil)
 	}
-	success, msg := retry(15, func() (bool, string) {
+	// the chance of node2 is not chosen for pushpull is 0.75
+	// after 15 times, the the chance of still missing is 1.3%
+	// after 20 times -> 0.3%
+	// after 25 times -> 0.075%
+	success, msg := retry(25, func() (bool, string) {
 		m1.pushPull()
 		time.Sleep(10 * time.Millisecond)
 		if m2.NumActive() != 5 {
