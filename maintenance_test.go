@@ -192,6 +192,57 @@ func TestMemberlist_GossipToDead(t *testing.T) {
 	require.True(t, success, msg)
 }
 
+func TestMemberlist_NextProbeNode(t *testing.T) {
+	m, cleanup, err := newTestMemberlistNoSchedule()
+	defer cleanup()
+	require.Nil(t, err)
+
+	node, err := m.nextProbeNode() // probeIdx == 1
+	require.NotNil(t, err)
+	require.Nil(t, node)
+
+	m.nodeL.Lock()
+	for i := 0; i < 4; i++ {
+		node := nodeState{
+			Node: &Node{
+				ID:   fmt.Sprintf("test %d", i),
+				IP:   []byte{127, 0, 0, byte(i)},
+				Port: 7946,
+			},
+			Lives: 1,
+			State: StateAlive,
+		}
+		m.nodes = append(m.nodes, &node)
+		m.nodeMap[node.Node.ID] = &node
+	}
+	m.nodeMap["test 1"].State = StateDead
+	m.nodeMap["test 2"].State = StateSuspect
+	m.nodeMap["test 3"].State = StateDead
+	m.nodeL.Unlock()
+
+	node, err = m.nextProbeNode() // probeIdx == 3
+	require.Nil(t, err)
+	require.Equal(t, "test 2", node.Node.ID)
+
+	// wrap around
+	node, err = m.nextProbeNode() // probeIdx == 1
+	require.Nil(t, err)
+	require.Equal(t, "test 0", node.Node.ID)
+
+	node, err = m.nextProbeNode() // probeIdx == 3
+	require.Nil(t, err)
+	require.Equal(t, "test 2", node.Node.ID)
+
+	m.nodeL.Lock()
+	m.nodeMap["test 0"].State = StateLeft
+	m.nodeMap["test 2"].State = StateDead
+	m.nodeL.Unlock()
+
+	node, err = m.nextProbeNode() // probeIdx == 5
+	require.NotNil(t, err)
+	require.Nil(t, node)
+}
+
 func TestMemberlist_ProbeNode(t *testing.T) {
 	m1, m2, cleanup, err := twoNodesNoSchedule()
 	m1.config.ProbeInterval = 2 * time.Second // for suspect timeout
