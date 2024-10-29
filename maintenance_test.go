@@ -414,7 +414,16 @@ func TestMemberlist_ProbeNode_MissedNacks(t *testing.T) {
 	m1.probeNode(node)
 	took := time.Since(start)
 	require.True(t, took < probeTimeMax)
-	require.Equal(t, 1, m1.Health())
+
+	success, msg := retry(5, func() (bool, string) {
+		if m1.Health() == 1 {
+			return true, ""
+		}
+		// the bad node may not be included for indirectping. do it again.
+		m1.probeNode(node)
+		return false, "no missed nack"
+	})
+	require.True(t, success, msg)
 }
 
 func TestMemberlist_ProbeNode_HealthImproved(t *testing.T) {
