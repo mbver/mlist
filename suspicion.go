@@ -32,7 +32,7 @@ func newSuspicion(minTimeout time.Duration, maxTimeout time.Duration, confirmCap
 		timeoutFn(confirms)
 	}
 	timeout := maxTimeout
-	if confirmCap < 1 {
+	if confirmCap <= 1 {
 		timeout = minTimeout
 	}
 	s.timer = time.AfterFunc(timeout, s.timeoutFn)

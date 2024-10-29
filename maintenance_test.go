@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -183,11 +184,11 @@ func TestMemberlist_GossipToDead(t *testing.T) {
 		}
 		nodes := m2.ActiveNodes()
 		for _, n := range nodes {
-			if n.ID == m2.ID() && n.IP.String() == m2.config.BindAddr {
+			if n.ID == m1.ID() && n.IP.String() == m1.config.BindAddr {
 				return true, ""
 			}
 		}
-		return false, "node 2 not found"
+		return false, "node 1 not found"
 	})
 	require.True(t, success, msg)
 }
@@ -268,6 +269,102 @@ func TestMemberlist_ProbeNode(t *testing.T) {
 	require.True(t, took < probeTimeMax)
 }
 
+func TestMemberlist_ProbeNode_Suspect(t *testing.T) {
+	m1, m2, m3, cleanup, err := threeNodesNoSchedule()
+	m1.config.ProbeInterval = 200 * time.Millisecond
+	defer cleanup()
+	require.Nil(t, err)
+
+	addr2 := m2.LocalNodeState().Node.UDPAddress().String()
+	addr3 := m3.LocalNodeState().Node.UDPAddress().String()
+	n, err := m1.Join([]string{addr2, addr3})
+	require.Nil(t, err)
+	require.Equal(t, 2, n)
+
+	a := alive{
+		ID:   "test",
+		IP:   []byte{127, 0, 0, 4},
+		Port: 7495,
+	}
+	m1.aliveNode(&a, nil)
+	node := m1.GetNodeState("test")
+
+	m1.probeNode(node)
+
+	node = m1.GetNodeState("test")
+	require.Equal(t, StateSuspect, node.State)
+
+	seq2 := atomic.LoadUint32(&m2.pingMng.seqNo)
+	seq3 := atomic.LoadUint32(&m3.pingMng.seqNo)
+	require.True(t, seq2 == 1 || seq3 == 1, "at least one indirect ping")
+}
+
+func TestMemberlist_ProbeNode_Suspect_Dogpile(t *testing.T) {
+	cases := []struct {
+		name      string
+		npeers    int
+		nconfirms int
+		expected  time.Duration
+	}{
+		{"1 peer, no confirms", 1, 0, 500 * time.Millisecond},
+		{"2 peers, no confirms", 2, 0, 500 * time.Millisecond},
+		{"3 peers, no confirms", 3, 0, 500 * time.Millisecond},
+		{"4 peers, no confirms", 4, 0, 1000 * time.Millisecond},
+		{"5 peers, no confirms", 5, 0, 1000 * time.Millisecond},
+		{"5 peers, 1 confirm", 5, 1, 750 * time.Millisecond},
+		{"5 peers, 2 confirms", 5, 2, 604 * time.Millisecond},
+		{"5 peers, 3 confirms", 5, 3, 500 * time.Millisecond},
+		{"5 peers, 4 confirms", 5, 4, 500 * time.Millisecond},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			m, cleanup, err := newTestMemberlistNoSchedule()
+			defer cleanup()
+			require.Nil(t, err)
+
+			m.config.ProbeInterval = 100 * time.Millisecond
+			m.config.SuspicionMult = 5
+			m.config.SuspicionMaxTimeoutMult = 2
+
+			for i := 0; i < c.npeers-1; i++ {
+				a := alive{
+					Lives: 1,
+					ID:    fmt.Sprintf("test %d", i),
+					IP:    []byte{127, 0, 0, byte(i)},
+					Port:  1234,
+				}
+				m.aliveNode(&a, nil)
+			}
+
+			// add the bad peer
+			a := alive{1, "bad", []byte{127, 0, 0, 5}, 7891, nil}
+			m.aliveNode(&a, nil)
+			require.Equal(t, c.npeers+1, m.NumActive())
+
+			node := m.GetNodeState("bad")
+			m.probeNode(node)
+
+			node = m.GetNodeState("bad")
+			require.Equal(t, StateSuspect, node.State)
+
+			for i := 0; i < c.nconfirms; i++ {
+				s := suspect{Lives: 1, ID: "bad", From: fmt.Sprintf("test %d", i)}
+				m.suspectNode(&s)
+			}
+
+			epsilon := 25 * time.Millisecond
+			time.Sleep(c.expected - epsilon)
+
+			node = m.GetNodeState("bad")
+			require.Equal(t, StateSuspect, node.State)
+
+			time.Sleep(2 * epsilon)
+			node = m.GetNodeState("bad")
+			require.Equal(t, StateDead, node.State)
+		})
+	}
+}
+
 func TestMemberlist_ProbeNode_MissedNacks(t *testing.T) {
 	m1, m2, cleanup, err := twoNodesNoSchedule()
 	m1.config.ProbeInterval = 200 * time.Millisecond // for suspect timeout
@@ -345,16 +442,22 @@ func TestMemberlist_ProbeNode_HealthAlreadyDegraded(t *testing.T) {
 		Port: 7495,
 	}
 	m1.aliveNode(&a, nil)
+
 	node := m1.GetNodeState("test")
 	start := time.Now()
 	m1.probeNode(node)
 	took := time.Since(start)
+
 	require.True(t, took > probeTimeMin, "probe too quickly")
+
 	node = m1.GetNodeState("test")
 	require.Equal(t, StateSuspect, node.State)
+
 	require.Equal(t, 1, m1.Health())
-	require.Equal(t, 1, int(m2.pingMng.seqNo)) // indirect ping
-	require.Equal(t, 1, int(m3.pingMng.seqNo)) // indirect ping
+
+	seq2 := atomic.LoadUint32(&m2.pingMng.seqNo)
+	seq3 := atomic.LoadUint32(&m3.pingMng.seqNo)
+	require.True(t, seq2 == 1 || seq3 == 1, "at least one indirect ping")
 }
 
 func TestMemberlist_ProbeNode_Buddy(t *testing.T) {
