@@ -158,7 +158,7 @@ func (m *Memberlist) probeNode(node *nodeState) {
 	indirectCh := m.IndirectPing(node, timeout)
 	tcpCh := m.TcpPing(node, timeout)
 	var indirectRes indirectPingResult
-
+	tm := time.NewTimer(timeout + m.config.MaxRTT)
 WAIT:
 	for {
 		select {
@@ -172,16 +172,14 @@ WAIT:
 				success = true
 				break WAIT
 			}
-		case <-time.After(timeout + m.config.MaxRTT):
+		case <-tm.C:
 			break WAIT
 		}
 	}
-
 	if success {
 		m.awr.Punish(-1) // improve health
 		return
 	}
-
 	missedNacks := indirectRes.numNode - indirectRes.nNacks
 	m.awr.Punish(missedNacks)
 	m.logger.Printf("[INFO] memberlist: Suspect %s has failed, no acks received", node.Node.ID)

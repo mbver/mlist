@@ -262,10 +262,10 @@ func TestMemberlist_ProbeNode(t *testing.T) {
 
 	start := time.Now()
 	m1.probeNode(node)
-	end := time.Now()
+	took := time.Since(start)
 	node = m1.GetNodeState(m2.ID())
 	require.Equal(t, StateSuspect, node.State)
-	require.True(t, end.Before(start.Add(probeTimeMax)))
+	require.True(t, took < probeTimeMax)
 }
 
 func TestMemberlist_ProbeNode_Buddy(t *testing.T) {
@@ -301,6 +301,42 @@ func TestMemberlist_ProbeNode_Buddy(t *testing.T) {
 		return true, ""
 	})
 	require.True(t, success, msg)
+}
+
+func TestMemberlist_ProbeNode_MissedNacks(t *testing.T) {
+	m1, m2, cleanup, err := twoNodesNoSchedule()
+	m1.config.ProbeInterval = 2 * time.Second // for suspect timeout
+	probeTimeMax := m1.awr.ScaleTimeout(m1.config.ProbeInterval) + m1.config.MaxRTT + 10*time.Millisecond
+	defer cleanup()
+	require.Nil(t, err)
+
+	joinAndTest(t, m1, m2)
+
+	require.Zero(t, m1.Health())
+
+	m1.nodeL.Lock()
+	for i := 0; i < 2; i++ {
+		node := nodeState{
+			Node: &Node{
+				ID:   fmt.Sprintf("test %d", i),
+				IP:   []byte{127, 0, 0, byte(i)},
+				Port: 7946,
+			},
+			Lives: 1,
+			State: StateAlive,
+		}
+		m1.nodes = append(m1.nodes, &node)
+		m1.nodeMap[node.Node.ID] = &node
+	}
+	m1.nodeL.Unlock()
+
+	node := m1.GetNodeState("test 0")
+
+	start := time.Now()
+	m1.probeNode(node)
+	took := time.Since(start)
+	require.True(t, took < probeTimeMax)
+	require.Equal(t, 1, m1.Health())
 }
 
 func TestMemberlist_Reap(t *testing.T) {
