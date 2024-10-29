@@ -111,6 +111,7 @@ func TestPushPull_SendReceive(t *testing.T) {
 	}
 	require.Equal(t, node.Port, uint16(m1.config.BindPort))
 
+	time.Sleep(10 * time.Millisecond) // wait for m1 merge state
 	require.Equal(t, 4, m1.NumActive())
 	nodes := m1.ActiveNodes()
 	found := make([]bool, 3)
