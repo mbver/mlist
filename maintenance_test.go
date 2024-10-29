@@ -193,6 +193,22 @@ func TestMemberlist_GossipToDead(t *testing.T) {
 	require.True(t, success, msg)
 }
 
+func TestMemberlist_Probe(t *testing.T) {
+	m1, m2, cleanup, err := twoNodesNoSchedule()
+	defer cleanup()
+	require.Nil(t, err)
+
+	joinAndTest(t, m1, m2)
+
+	m1.probe()
+
+	node := m1.GetNodeState(m2.config.ID)
+	require.Equal(t, StateAlive, node.State)
+
+	seq := atomic.LoadUint32(&m1.pingMng.seqNo)
+	require.Equal(t, 1, int(seq))
+}
+
 func TestMemberlist_NextProbeNode(t *testing.T) {
 	m, cleanup, err := newTestMemberlistNoSchedule()
 	defer cleanup()
