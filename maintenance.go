@@ -127,16 +127,20 @@ func (m *Memberlist) nextProbeNode() (*nodeState, error) {
 	m.nodeL.RLock()
 	defer m.nodeL.RUnlock()
 	m.probeIdx++
-	if m.probeIdx >= len(m.nodes) {
-		m.probeIdx = 0
-	}
-	for m.probeIdx < len(m.nodes) {
-		node := m.nodes[m.probeIdx]
-		if node.Node.ID == m.ID() || node.DeadOrLeft() {
-			m.probeIdx++
-			continue
+	wrapAround := false
+	for !wrapAround {
+		if m.probeIdx >= len(m.nodes) {
+			m.probeIdx = 0
+			wrapAround = true
 		}
-		return node.Clone(), nil
+		for m.probeIdx < len(m.nodes) {
+			node := m.nodes[m.probeIdx]
+			if node.Node.ID == m.ID() || node.DeadOrLeft() {
+				m.probeIdx++
+				continue
+			}
+			return node.Clone(), nil
+		}
 	}
 	return nil, fmt.Errorf("no node to probe")
 }
