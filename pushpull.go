@@ -13,6 +13,11 @@ import (
 
 const pushPullScaleThreshold = 32
 
+type UserStateDelegate interface {
+	LocalState() []byte
+	MergeState([]byte)
+}
+
 type stateToMerge struct {
 	Lives uint32
 	ID    string
@@ -23,7 +28,8 @@ type stateToMerge struct {
 }
 
 type pushPullHeader struct {
-	Nodes int
+	Nodes        int
+	UserStateLen int
 }
 
 func pushPullScale(interval time.Duration, n int) time.Duration {
@@ -54,60 +60,65 @@ func (m *Memberlist) pushPull() {
 
 func (m *Memberlist) pushPullWithNode(addr string) error {
 	// Attempt to send and receive with the node
-	remoteNodes, err := m.sendAndReceiveState(addr)
+	remoteNodes, remoteUserState, err := m.sendAndReceiveState(addr)
 	if err != nil {
 		return err
 	}
 
 	m.mergeState(remoteNodes)
+	if m.usrState != nil {
+		m.usrState.MergeState(remoteUserState)
+	}
 	return nil
 }
 
-func (m *Memberlist) sendAndReceiveState(addr string) ([]stateToMerge, error) {
+func (m *Memberlist) sendAndReceiveState(addr string) ([]stateToMerge, []byte, error) {
 	// Attempt to connect
 	conn, err := m.transport.DialTimeout(addr, m.config.TcpTimeout)
 	if err != nil { // timeout error if unable to connect
-		return nil, err
+		return nil, nil, err
 	}
 	defer conn.Close()
 	m.logger.Printf("[DEBUG] memberlist: Initiating push/pull sync with: %s %s", addr, conn.RemoteAddr())
 
 	// Send our state
 	if err := m.sendLocalState(conn, m.config.Label); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	conn.SetDeadline(time.Now().Add(m.config.TcpTimeout))
 	msgType, bufConn, dec, err := m.unpackStream(conn, m.config.Label)
 
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if msgType == errMsg {
 		var resp errResp
 		if err := dec.Decode(&resp); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		return nil, fmt.Errorf("remote error: %v", resp.Error)
+		return nil, nil, fmt.Errorf("remote error: %v", resp.Error)
 	}
 	// Quit if not push/pull
 	if msgType != pushPullMsg {
 		err := fmt.Errorf("received invalid msgType (%d), expected pushPullMsg (%d) from %s", msgType, pushPullMsg, conn.RemoteAddr())
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Read remote state
-	remoteNodes, err := m.readRemoteState(bufConn, dec)
-	return remoteNodes, err
+	return m.readRemoteState(bufConn, dec)
 }
 
 func (m *Memberlist) sendLocalState(conn net.Conn, streamLabel string) error {
 	conn.SetDeadline(time.Now().Add(m.config.TcpTimeout))
 	localState := m.localState()
-
+	var usrState []byte
+	if m.usrState != nil {
+		usrState = m.usrState.LocalState()
+	}
 	// Create a buffered writer
-	msg, err := encodePushPullMsg(localState)
+	msg, err := encodePushPullMsg(localState, usrState)
 	if err != nil {
 		return err
 	}
@@ -131,9 +142,12 @@ func (m *Memberlist) localState() []stateToMerge {
 	return res
 }
 
-func encodePushPullMsg(localNodes []stateToMerge) ([]byte, error) {
+func encodePushPullMsg(localNodes []stateToMerge, usrState []byte) ([]byte, error) {
 	buf := bytes.NewBuffer(nil)
-	header := pushPullHeader{Nodes: len(localNodes)}
+	header := pushPullHeader{
+		Nodes:        len(localNodes),
+		UserStateLen: len(usrState),
+	}
 	hd := codec.MsgpackHandle{}
 	enc := codec.NewEncoder(buf, &hd)
 
@@ -150,14 +164,20 @@ func encodePushPullMsg(localNodes []stateToMerge) ([]byte, error) {
 			return nil, err
 		}
 	}
+
+	if len(usrState) != 0 {
+		if _, err := buf.Write(usrState); err != nil {
+			return nil, err
+		}
+	}
 	return buf.Bytes(), nil
 }
 
 // r is used to read user state. skip for now
-func (m *Memberlist) readRemoteState(r io.Reader, dec *codec.Decoder) ([]stateToMerge, error) {
+func (m *Memberlist) readRemoteState(r io.Reader, dec *codec.Decoder) ([]stateToMerge, []byte, error) {
 	var header pushPullHeader
 	if err := dec.Decode(&header); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	remoteNodes := make([]stateToMerge, header.Nodes)
@@ -165,11 +185,18 @@ func (m *Memberlist) readRemoteState(r io.Reader, dec *codec.Decoder) ([]stateTo
 	// Try to decode all the states
 	for i := 0; i < header.Nodes; i++ {
 		if err := dec.Decode(&remoteNodes[i]); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
-
-	return remoteNodes, nil
+	var usrState []byte
+	if header.UserStateLen != 0 {
+		usrState = make([]byte, header.UserStateLen)
+		_, err := io.ReadFull(r, usrState)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+	return remoteNodes, usrState, nil
 }
 
 func (m *Memberlist) mergeState(remote []stateToMerge) {

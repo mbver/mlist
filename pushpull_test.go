@@ -82,7 +82,7 @@ func TestPushPull_SendReceive(t *testing.T) {
 		localNodes2[i].State = StateAlive
 	}
 
-	encoded, err := encodePushPullMsg(localNodes2)
+	encoded, err := encodePushPullMsg(localNodes2, nil)
 	require.Nil(t, err)
 
 	timeout := 2 * time.Second
@@ -97,7 +97,7 @@ func TestPushPull_SendReceive(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, pushPullMsg, msgType)
 
-	remoteNodes, err := m.readRemoteState(bufConn, dec)
+	remoteNodes, _, err := m.readRemoteState(bufConn, dec)
 	require.Nil(t, err)
 	require.Equal(t, 1, len(remoteNodes))
 
