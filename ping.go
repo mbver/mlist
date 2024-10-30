@@ -175,11 +175,11 @@ func (m *Memberlist) Ping(node *nodeState, timeout time.Duration) bool {
 		s := suspect{Lives: node.Lives, ID: node.Node.ID, From: m.ID()}
 		msg, err := buddyPingMsg(p, s)
 		if err != nil {
-			// log err
+			m.logger.Printf("[ERR] memberlist: failed to prepare buddy ping msg %v", err)
 			return false
 		}
 		if err = m.sendUdp(node.Node.UDPAddress(), msg); err != nil {
-			// log err
+			m.logger.Printf("[ERR] memberlist: failed to send udp msg %v", err)
 			return false
 		}
 	}
@@ -208,7 +208,7 @@ func (m *Memberlist) IndirectPing(node *nodeState, timeout time.Duration) chan i
 	go func() {
 		localIp, localPort, err := m.GetAdvertiseAddr()
 		if err != nil {
-			// log error
+			m.logger.Printf("[ERR] memberlist: failed to get advertise address %v", err)
 			resultCh <- indirectPingResult{false, 0, 0}
 			return
 		}
@@ -261,7 +261,7 @@ func (m *Memberlist) TcpPing(node *nodeState, timeout time.Duration) chan bool {
 		deadline := start.Add(timeout)
 		localIp, localPort, err := m.GetAdvertiseAddr()
 		if err != nil {
-			// log error
+			m.logger.Printf("[ERR] memberlist: failed to get advertise address %v", err)
 			result <- false
 			return
 		}
@@ -295,8 +295,8 @@ func (m *Memberlist) TcpPing(node *nodeState, timeout time.Duration) chan bool {
 			result <- false
 			return
 		}
-		if msgType != ackMsg { // log error
-			// m.logger.Printf("unexpected msgType (%d) from ping %s", msgType, LogConn(conn))
+		if msgType != ackMsg {
+			m.logger.Printf("[ERR] memberlist: unexpected msgType (%d) in ping from %s", msgType, conn.RemoteAddr())
 			result <- false
 			return
 		}

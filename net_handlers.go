@@ -204,7 +204,7 @@ func (m *Memberlist) handleIndirectPing(msg []byte, from *net.UDPAddr) {
 			indAck.Success = false
 		}
 		if err := m.encodeAndSendUdp(addr, indirectAckMsg, indAck); err != nil {
-			// log error
+			m.logger.Printf("[ERR] memberlist: failed to send indirect ack %v", err)
 		}
 	}()
 }
@@ -212,7 +212,7 @@ func (m *Memberlist) handleIndirectPing(msg []byte, from *net.UDPAddr) {
 func (m *Memberlist) handleIndirectAck(msg []byte, from *net.UDPAddr) {
 	var in indirectAck
 	if err := decode(msg, &in); err != nil {
-		// log error with from
+		m.logger.Printf("[ERR] memberlist: failed to decode indirect ack %v", err)
 		return
 	}
 	m.pingMng.invokeIndirectAckHandler(in)

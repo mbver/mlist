@@ -117,7 +117,7 @@ PICKNODE:
 func (m *Memberlist) probe() {
 	node, err := m.nextProbeNode()
 	if err != nil {
-		// log error
+		m.logger.Printf("[WARN] memberlist: failed to obtain next node to probe: %s", err)
 		return
 	}
 	m.probeNode(node)
