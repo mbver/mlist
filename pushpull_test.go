@@ -1,7 +1,6 @@
 package memberlist
 
 import (
-	"bytes"
 	"fmt"
 	"net"
 	"testing"
@@ -19,7 +18,7 @@ func (u *mockUserStateDelegate) LocalState() []byte {
 }
 
 func (u *mockUserStateDelegate) Merge(s []byte) {
-	u.local = string(s)
+	u.local += string(s)
 }
 
 func TestPushPull_MergeState(t *testing.T) {
@@ -129,7 +128,7 @@ func TestPushPull_SendReceive(t *testing.T) {
 
 	// user-states is exchanged
 	require.Equal(t, m.config.ID, string(remoteUserState))
-	require.True(t, bytes.Equal(m.usrState.LocalState(), userState))
+	require.Contains(t, string(m.usrState.LocalState()), string(userState))
 
 	time.Sleep(10 * time.Millisecond) // wait for m1 merge state
 	require.Equal(t, 4, m.NumActive())

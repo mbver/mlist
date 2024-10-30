@@ -62,7 +62,13 @@ func TestMemberlist_PushPull(t *testing.T) {
 	defer cleanup()
 	require.Nil(t, err)
 
+	m1.usrState = &mockUserStateDelegate{m1.config.ID}
+	m2.usrState = &mockUserStateDelegate{m2.config.ID}
 	joinAndTest(t, m1, m2)
+
+	// user state exchanged
+	require.Contains(t, string(m1.usrState.LocalState()), m2.config.ID)
+	require.Contains(t, string(m2.usrState.LocalState()), m1.config.ID)
 
 	for i := 0; i < 3; i++ {
 		a := alive{
@@ -102,6 +108,12 @@ func TestMemberlist_PushPull(t *testing.T) {
 			if !v {
 				return false, fmt.Sprintf("not found %d", i)
 			}
+		}
+		if len(m1.usrState.LocalState()) < 4*len(m1.config.ID) {
+			return false, "user state is not exchanged"
+		}
+		if len(m2.usrState.LocalState()) < 4*len(m1.config.ID) {
+			return false, "user state is not exchanged"
 		}
 		return true, ""
 	})
