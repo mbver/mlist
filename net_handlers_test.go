@@ -118,6 +118,58 @@ func TestHandleCompoundPing(t *testing.T) {
 	}
 }
 
+func TestHandlePing_Piggyback(t *testing.T) {
+	m, cleanup, err := newTestMemberlistNoSchedule()
+	defer cleanup()
+	require.Nil(t, err)
+
+	udp := listenUDP(t)
+	defer udp.Close()
+	udpAddr := udp.LocalAddr().(*net.UDPAddr)
+
+	p := ping{
+		SeqNo:      42,
+		ID:         m.config.ID,
+		SourceIP:   udpAddr.IP,
+		SourcePort: uint16(udpAddr.Port),
+	}
+
+	encoded, err := encode(pingMsg, p)
+	require.Nil(t, err)
+	packed, err := m.packUdp(encoded)
+	require.Nil(t, err)
+
+	addr := m.LocalNodeState().Node.UDPAddress()
+	_, err = udp.WriteTo(packed, addr)
+	require.Nil(t, err)
+
+	in := make([]byte, 1400)
+	udp.SetDeadline(time.Now().Add(50 * time.Millisecond))
+	n, _, err := udp.ReadFrom(in)
+	require.Nil(t, err)
+
+	unpacked, err := m.unpackPacket(in[:n], m.config.Label)
+	require.Nil(t, err)
+	require.Equal(t, compoundMsg, msgType(unpacked[0]))
+
+	trunc, msgs, err := unpackCompoundMsg(unpacked[1:])
+	require.Nil(t, err)
+	require.Zero(t, trunc)
+	require.Equal(t, 2, len(msgs))
+
+	require.Equal(t, ackMsg, msgType(msgs[0][0]))
+	var a ack
+	err = decode(msgs[0][1:], &a)
+	require.Nil(t, err)
+	require.Equal(t, 42, int(a.SeqNo))
+
+	require.Equal(t, aliveMsg, msgType(msgs[1][0]))
+	var al alive
+	err = decode(msgs[1][1:], &al)
+	require.Nil(t, err)
+	require.Equal(t, m.config.ID, al.ID)
+}
+
 func TestHandlePing_WrongNode(t *testing.T) {
 	m, cleanup, err := newTestMemberlistNoSchedule()
 	defer cleanup()
