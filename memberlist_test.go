@@ -8,6 +8,7 @@ import (
 	"os"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -153,6 +154,23 @@ func TestMemberlist_Join(t *testing.T) {
 	defer cleanup()
 	require.Nil(t, err)
 	joinAndTest(t, m1, m2)
+}
+
+func TestMemberlist_Join_MismatchedKeys(t *testing.T) {
+	m1, m2, cleanup, err := twoTestNodes()
+	defer cleanup()
+	require.Nil(t, err)
+
+	key := []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 222}
+	keyRing, err := NewKeyring(nil, key)
+	require.Nil(t, err)
+	m1.keyring = keyRing
+
+	addr := m2.LocalNodeState().Node.UDPAddress().String()
+	n, err := m1.Join([]string{addr})
+	require.NotNil(t, err)
+	require.True(t, strings.Contains(err.Error(), "no installed keys could decrypt the message"))
+	require.Zero(t, n)
 }
 
 func TestMemberlist_JoinSingleNetMask(t *testing.T) {
