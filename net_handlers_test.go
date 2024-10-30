@@ -1,13 +1,24 @@
 package memberlist
 
 import (
+	"bytes"
 	"fmt"
+	"log"
 	"net"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestHandleUDP_ZeroLengthMsg(t *testing.T) {
+	var buf bytes.Buffer
+	m := Memberlist{
+		logger: log.New(&buf, "", 0),
+	}
+	m.handleUdpMsg(nil, nil, time.Now())
+	require.Contains(t, buf.String(), "missing message type byte")
+}
 
 func listenUDP(t *testing.T) *net.UDPConn {
 	var udp *net.UDPConn
