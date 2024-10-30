@@ -29,9 +29,9 @@ func TestCompressDecompress(t *testing.T) {
 	port := uint16(57732)
 	msg := indirectPing{
 		SeqNo:      42,
+		ID:         "node 1",
 		IP:         ip,
 		Port:       port,
-		Node:       "node1",
 		SourceIP:   ip,
 		SourcePort: port,
 	}
@@ -45,7 +45,7 @@ func TestCompressDecompress(t *testing.T) {
 	var decoded indirectPing
 	decode(decomp[1:], &decoded)
 	require.Equal(t, decoded.SeqNo, msg.SeqNo)
-	require.Equal(t, decoded.Node, msg.Node)
+	require.Equal(t, decoded.ID, msg.ID)
 	require.Equal(t, decoded.Port, msg.Port)
 	require.Equal(t, decoded.SourcePort, msg.SourcePort)
 	if !bytes.Equal(decoded.IP, msg.IP) || !bytes.Equal(decoded.SourceIP, msg.SourceIP) {

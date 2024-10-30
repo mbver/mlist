@@ -191,7 +191,7 @@ func (m *Memberlist) handleIndirectPing(msg []byte, from *net.UDPAddr) {
 	}
 	node := &nodeState{
 		Node: &Node{
-			ID:   ind.Node,
+			ID:   ind.ID,
 			IP:   ind.IP,
 			Port: ind.Port,
 		},

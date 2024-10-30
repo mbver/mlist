@@ -97,9 +97,9 @@ func buddyPingMsg(p ping, s suspect) ([]byte, error) {
 
 type indirectPing struct {
 	SeqNo      uint32
+	ID         string
 	IP         []byte
 	Port       uint16
-	Node       string
 	SourceIP   []byte `codec:",omitempty"`
 	SourcePort uint16 `codec:",omitempty"`
 }
@@ -226,9 +226,9 @@ func (m *Memberlist) IndirectPing(node *nodeState, timeout time.Duration) chan i
 
 		ind := indirectPing{
 			SeqNo:      m.pingMng.nextSeqNo(),
+			ID:         node.Node.ID,
 			IP:         node.Node.IP,
 			Port:       node.Node.Port,
-			Node:       node.Node.ID,
 			SourceIP:   localIp,
 			SourcePort: localPort,
 		}
