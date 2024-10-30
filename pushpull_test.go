@@ -1,6 +1,7 @@
 package memberlist
 
 import (
+	"bytes"
 	"fmt"
 	"net"
 	"testing"
@@ -8,6 +9,18 @@ import (
 
 	"github.com/stretchr/testify/require"
 )
+
+type mockUserStateDelegate struct {
+	local string
+}
+
+func (u *mockUserStateDelegate) LocalState() []byte {
+	return []byte(u.local)
+}
+
+func (u *mockUserStateDelegate) Merge(s []byte) {
+	u.local = string(s)
+}
 
 func TestPushPull_MergeState(t *testing.T) {
 	m, cleanup, err := newTestMemberlistNoSchedule()
@@ -70,6 +83,11 @@ func TestPushPull_SendReceive(t *testing.T) {
 	m, cleanup1, err := newTestMemberlistNoSchedule()
 	defer cleanup1()
 	require.Nil(t, err)
+
+	m.usrState = &mockUserStateDelegate{
+		local: m.config.ID,
+	}
+
 	addr := m.LocalNodeState().Node.UDPAddress().String()
 
 	// fake local state to send to m1
@@ -82,7 +100,8 @@ func TestPushPull_SendReceive(t *testing.T) {
 		localNodes2[i].State = StateAlive
 	}
 
-	encoded, err := encodePushPullMsg(localNodes2, nil)
+	userState := []byte("user state")
+	encoded, err := encodePushPullMsg(localNodes2, userState)
 	require.Nil(t, err)
 
 	timeout := 2 * time.Second
@@ -97,7 +116,7 @@ func TestPushPull_SendReceive(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, pushPullMsg, msgType)
 
-	remoteNodes, _, err := m.readRemoteState(bufConn, dec)
+	remoteNodes, remoteUserState, err := m.readRemoteState(bufConn, dec)
 	require.Nil(t, err)
 	require.Equal(t, 1, len(remoteNodes))
 
@@ -107,6 +126,10 @@ func TestPushPull_SendReceive(t *testing.T) {
 		t.Fatalf("unmatched ip: expect: %s, got: %s", m.config.BindAddr, node.IP)
 	}
 	require.Equal(t, node.Port, uint16(m.config.BindPort))
+
+	// user-states is exchanged
+	require.Equal(t, m.config.ID, string(remoteUserState))
+	require.True(t, bytes.Equal(m.usrState.LocalState(), userState))
 
 	time.Sleep(10 * time.Millisecond) // wait for m1 merge state
 	require.Equal(t, 4, m.NumActive())

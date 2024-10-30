@@ -15,7 +15,7 @@ const pushPullScaleThreshold = 32
 
 type UserStateDelegate interface {
 	LocalState() []byte
-	MergeState([]byte)
+	Merge([]byte)
 }
 
 type stateToMerge struct {
@@ -67,7 +67,7 @@ func (m *Memberlist) pushPullWithNode(addr string) error {
 
 	m.mergeState(remoteNodes)
 	if m.usrState != nil {
-		m.usrState.MergeState(remoteUserState)
+		m.usrState.Merge(remoteUserState)
 	}
 	return nil
 }

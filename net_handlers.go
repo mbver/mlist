@@ -438,7 +438,7 @@ func (m *Memberlist) handlePushPull(connReader io.Reader, dec *codec.Decoder, co
 	}
 
 	// don't care about userState
-	remoteNodes, _, err := m.readRemoteState(connReader, dec)
+	remoteNodes, remoteUserState, err := m.readRemoteState(connReader, dec)
 	if err != nil {
 		m.logger.Printf("[ERR] memberlist: Failed to read remote state: %s from %s", err, conn.RemoteAddr())
 		return
@@ -450,4 +450,8 @@ func (m *Memberlist) handlePushPull(connReader io.Reader, dec *codec.Decoder, co
 	}
 
 	m.mergeState(remoteNodes)
+
+	if m.usrState != nil {
+		m.usrState.Merge(remoteUserState)
+	}
 }
