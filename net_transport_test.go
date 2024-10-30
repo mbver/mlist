@@ -18,32 +18,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newPackTestMemberlist() (*Memberlist, error) {
-	key := []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
-	keyRing, err := NewKeyring(nil, key)
-	if err != nil {
-		return nil, err
-	}
-	conf := &Config{
-		Label:             "label",
-		EnableCompression: true,
-	}
-	return &Memberlist{
-		keyring: keyRing,
-		config:  conf,
-	}, nil
-}
-
 func TestNetPacking_PackUnpackUDP(t *testing.T) {
-	m, err := newPackTestMemberlist()
-	require.Nil(t, err, "setup memberlist failed")
+	m, cleanup, err := newTestMemberlistNoSchedule()
+	defer cleanup()
+	require.Nil(t, err)
+
 	msg := []byte("this is a message")
-	label := "label"
 
 	packed, err := m.packUdp(msg)
 	require.Nil(t, err, "pack msg failed")
 
-	unpacked, err := m.unpackPacket(packed, label)
+	unpacked, err := m.unpackPacket(packed, m.config.Label)
 	require.Nil(t, err, "unpack msg failed")
 
 	if !bytes.Equal(unpacked, msg) {
@@ -51,48 +36,36 @@ func TestNetPacking_PackUnpackUDP(t *testing.T) {
 	}
 }
 
-// MockConn implements net.Conn interface
-type MockConn struct {
-	buf bytes.Buffer
-}
-
-func NewMockConn() *MockConn {
-	return &MockConn{
-		buf: *bytes.NewBuffer(nil),
-	}
-}
-func (c *MockConn) Read(b []byte) (int, error) {
-	return c.buf.Read(b)
-}
-func (c *MockConn) Write(b []byte) (int, error) {
-	return c.buf.Write(b)
-}
-
-func (c *MockConn) Close() error                       { return nil }
-func (c *MockConn) LocalAddr() net.Addr                { return nil }
-func (c *MockConn) RemoteAddr() net.Addr               { return nil }
-func (c *MockConn) SetDeadline(t time.Time) error      { return nil }
-func (c *MockConn) SetReadDeadline(t time.Time) error  { return nil }
-func (c *MockConn) SetWriteDeadline(t time.Time) error { return nil }
-
 func TestNetPacking_PackUnpackTCP(t *testing.T) {
-	m, err := newPackTestMemberlist()
-	require.Nil(t, err, "setup memberlist failed")
+	m, cleanup, err := newTestMemberlistNoSchedule()
+	defer cleanup()
+	require.Nil(t, err)
+
+	m.Shutdown() // stop udp, tcp receivers
+	m.transport.Start()
+	defer m.transport.Shutdown()
 
 	msg := []byte("this is a message")
 	encoded, err := encode(pushPullMsg, msg)
 	require.Nil(t, err, "fail to encode message")
 
-	label := "label"
+	packed, err := m.packTcp(encoded, m.config.Label)
+	require.Nil(t, err)
 
-	packed, err := m.packTcp(encoded, label)
-	require.Nil(t, err, "pack msg tcp failed")
+	addr := m.LocalNodeState().Node.UDPAddress().String()
+	timeout := 2 * time.Second
+	conn, err := m.transport.DialTimeout(addr, timeout)
+	require.Nil(t, err)
+	defer conn.Close()
 
-	conn := NewMockConn()
-	conn.Write(packed)
+	recvConn := <-m.transport.TcpConnCh()
+	defer recvConn.Close()
+	recvConn.SetDeadline(time.Now().Add(timeout))
 
-	msgType, _, dec, err := m.unpackStream(conn, label)
+	_, err = conn.Write(packed)
+	require.Nil(t, err)
 
+	msgType, _, dec, err := m.unpackStream(recvConn, m.config.Label)
 	require.Nil(t, err, "fail to unpack stream")
 	require.Equal(t, msgType, pushPullMsg, "unmatched message type")
 
@@ -116,7 +89,7 @@ func newTestTransport() (*NetTransport, func(), error) {
 	}
 	err = tr.Start()
 	if err != nil {
-		return tr, cleanup, err
+		return nil, cleanup, err
 	}
 	cleanup1 := func() {
 		tr.Shutdown()
@@ -125,21 +98,22 @@ func newTestTransport() (*NetTransport, func(), error) {
 	return tr, cleanup1, nil
 }
 
-func TestNetTransport_SendReceiveUDP(t *testing.T) {
+func twoTransports() (*NetTransport, *NetTransport, func(), error) {
 	t1, cleanup1, err := newTestTransport()
-	defer func() {
-		if cleanup1 != nil {
-			cleanup1()
-		}
-	}()
-	require.Nil(t, err)
-
+	if err != nil {
+		return nil, nil, cleanup1, err
+	}
 	t2, cleanup2, err := newTestTransport()
-	defer func() {
-		if cleanup2 != nil {
-			cleanup2()
-		}
-	}()
+	cleanup := getCleanup(cleanup1, cleanup2)
+	if err != nil {
+		return nil, nil, cleanup, err
+	}
+	return t1, t2, cleanup, err
+}
+
+func TestNetTransport_SendReceiveUDP(t *testing.T) {
+	t1, t2, cleanup, err := twoTransports()
+	defer cleanup()
 	require.Nil(t, err)
 
 	addr1, port1, err := t1.GetFirstAddr()
@@ -180,27 +154,19 @@ func TestNetTransport_SendReceiveUDP(t *testing.T) {
 }
 
 func TestNetTransport_SendReceiveTCP(t *testing.T) {
-	t1, cleanup1, err := newTestTransport()
-	defer func() {
-		if cleanup1 != nil {
-			cleanup1()
-		}
-	}()
+	t1, t2, cleanup, err := twoTransports()
+	defer cleanup()
 	require.Nil(t, err)
 
-	t2, cleanup2, err := newTestTransport()
-	defer func() {
-		if cleanup2 != nil {
-			cleanup2()
-		}
-	}()
+	msg := ping{SeqNo: 42, ID: "Node1"}
+	encoded, err := encode(pingMsg, msg)
 	require.Nil(t, err)
 
 	addr2, port2, err := t2.GetFirstAddr()
 	require.Nil(t, err)
 	tcpAddr2 := net.TCPAddr{IP: addr2, Port: port2}
 
-	timeout := 5 * time.Millisecond
+	timeout := 2 * time.Second
 	conn1, err := t1.DialTimeout(tcpAddr2.String(), timeout)
 	require.Nil(t, err)
 	defer conn1.Close()
@@ -215,10 +181,6 @@ func TestNetTransport_SendReceiveTCP(t *testing.T) {
 
 	conn1.SetDeadline(time.Now().Add(timeout))
 	conn2.SetDeadline(time.Now().Add(timeout))
-
-	msg := ping{SeqNo: 42, ID: "Node1"}
-	encoded, err := encode(pingMsg, msg)
-	require.Nil(t, err)
 
 	conn1.Write(encoded)
 

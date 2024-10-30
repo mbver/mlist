@@ -79,7 +79,7 @@ func (t *NetTransport) Start() error {
 
 	t.l.Lock()
 	defer t.l.Unlock()
-
+	atomic.StoreInt32(&t.shutdown, 0)
 	// create tcp and udp listeners on its addresses and port
 	for _, addr := range t.bindAddrs {
 		ip := net.ParseIP(addr)
@@ -139,8 +139,8 @@ func (t *NetTransport) Shutdown() {
 	if t.hasShutdown() {
 		return
 	}
-	atomic.StoreInt32(&t.shutdown, 1)
 	t.l.Lock()
+	atomic.StoreInt32(&t.shutdown, 1)
 	// Rip through all the connections and shut them down.
 	for _, ln := range t.tcpListeners {
 		ln.Close()
