@@ -484,3 +484,17 @@ func TestResolveAddr_TCP_First(t *testing.T) {
 		require.Equal(t, uint16(0), port)
 	}
 }
+
+func TestAdvertiseAddr(t *testing.T) {
+	m, cleanup, err := newTestMemberlistNoSchedule()
+	defer cleanup()
+	require.Nil(t, err)
+
+	require.Equal(t, m.config.AdvertiseAddr, m.config.BindAddr)
+	require.Equal(t, m.config.BindPort, m.config.AdvertisePort)
+
+	ip, port, err := m.GetAdvertiseAddr()
+	require.Nil(t, err)
+	require.Equal(t, m.config.AdvertiseAddr, ip.String())
+	require.Equal(t, m.config.BindPort, int(port))
+}
