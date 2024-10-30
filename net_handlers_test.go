@@ -195,3 +195,34 @@ func TestHandleIndirectPing(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 42, int(a.SeqNo))
 }
+
+func TestHandlePingTCP(t *testing.T) {
+	m, cleanup, err := newTestMemberlistNoSchedule()
+	defer cleanup()
+	require.Nil(t, err)
+
+	addr := m.LocalNodeState().Node.UDPAddress().String()
+	timeout := 2 * time.Second
+	conn, err := m.transport.DialTimeout(addr, timeout)
+	require.Nil(t, err)
+	defer conn.Close()
+
+	p := ping{
+		SeqNo: 42,
+		ID:    m.config.ID,
+	}
+	encoded, err := encode(pingMsg, p)
+	require.Nil(t, err)
+
+	conn.SetDeadline(time.Now().Add(timeout))
+	m.sendTcp(conn, encoded, m.config.Label)
+
+	mType, _, dec, err := m.unpackStream(conn, m.config.Label)
+	require.Nil(t, err)
+	require.Equal(t, ackMsg, mType)
+
+	var a ack
+	err = dec.Decode(&a)
+	require.Nil(t, err)
+	require.Equal(t, 42, int(a.SeqNo))
+}

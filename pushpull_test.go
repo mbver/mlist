@@ -67,20 +67,17 @@ func TestPushPull_MergeState(t *testing.T) {
 }
 
 func TestPushPull_SendReceive(t *testing.T) {
-	m1, cleanup1, err := newTestMemberlistNoSchedule()
+	m, cleanup1, err := newTestMemberlistNoSchedule()
 	defer cleanup1()
 	require.Nil(t, err)
-	addr := m1.LocalNodeState().Node.UDPAddress().String()
-
-	m2, err := newPackTestMemberlist()
-	require.Nil(t, err)
+	addr := m.LocalNodeState().Node.UDPAddress().String()
 
 	// fake local state to send to m1
 	localNodes2 := make([]stateToMerge, 3)
 	for i := 0; i < 3; i++ {
 		localNodes2[i].ID = fmt.Sprintf("Test %d", i)
-		localNodes2[i].IP = net.ParseIP(m1.config.BindAddr)
-		localNodes2[i].Port = uint16(m1.config.BindPort)
+		localNodes2[i].IP = net.ParseIP(m.config.BindAddr)
+		localNodes2[i].Port = uint16(m.config.BindPort)
 		localNodes2[i].Lives = 1
 		localNodes2[i].State = StateAlive
 	}
@@ -89,39 +86,39 @@ func TestPushPull_SendReceive(t *testing.T) {
 	require.Nil(t, err)
 
 	timeout := 2 * time.Second
-	conn, err := m2.transport.DialTimeout(addr, timeout)
+	conn, err := m.transport.DialTimeout(addr, timeout)
 	require.Nil(t, err)
 	defer conn.Close()
 
 	conn.SetDeadline(time.Now().Add(timeout))
-	m2.sendTcp(conn, encoded, m2.config.Label)
+	m.sendTcp(conn, encoded, m.config.Label)
 
-	msgType, bufConn, dec, err := m2.unpackStream(conn, m2.config.Label)
+	msgType, bufConn, dec, err := m.unpackStream(conn, m.config.Label)
 	require.Nil(t, err)
 	require.Equal(t, pushPullMsg, msgType)
 
-	remoteNodes, err := m2.readRemoteState(bufConn, dec)
+	remoteNodes, err := m.readRemoteState(bufConn, dec)
 	require.Nil(t, err)
 	require.Equal(t, 1, len(remoteNodes))
 
 	node := remoteNodes[0]
-	require.Equal(t, node.ID, m1.ID())
-	if node.IP.String() != m1.config.BindAddr {
-		t.Fatalf("unmatched ip: expect: %s, got: %s", m1.config.BindAddr, node.IP)
+	require.Equal(t, node.ID, m.ID())
+	if node.IP.String() != m.config.BindAddr {
+		t.Fatalf("unmatched ip: expect: %s, got: %s", m.config.BindAddr, node.IP)
 	}
-	require.Equal(t, node.Port, uint16(m1.config.BindPort))
+	require.Equal(t, node.Port, uint16(m.config.BindPort))
 
 	time.Sleep(10 * time.Millisecond) // wait for m1 merge state
-	require.Equal(t, 4, m1.NumActive())
-	nodes := m1.ActiveNodes()
+	require.Equal(t, 4, m.NumActive())
+	nodes := m.ActiveNodes()
 	found := make([]bool, 3)
 	for i := range found {
 		for _, n := range nodes {
 			if n.ID == fmt.Sprintf("Test %d", i) {
-				if n.IP.String() != m1.config.BindAddr {
+				if n.IP.String() != m.config.BindAddr {
 					continue
 				}
-				if n.Port != uint16(m1.config.BindPort) {
+				if n.Port != uint16(m.config.BindPort) {
 					continue
 				}
 				found[i] = true
