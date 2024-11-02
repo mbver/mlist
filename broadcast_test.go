@@ -57,9 +57,9 @@ func dumpQueue(q *TransmitCapQueue) []*TransmitCapItem {
 
 func TestBroadcast_QueueMsg(t *testing.T) {
 	q := &TransmitCapQueue{TransmitScale: 1, NumNodes: func() int { return 1 }, queue: *heap.NewHeap(), exists: map[string]*TransmitCapItem{}}
-	q.QueueMsg("a", 0, nil, nil)
-	q.QueueMsg("b", 0, nil, nil)
-	q.QueueMsg("c", 0, nil, nil)
+	q.QueueMsg("a", msgType(0), nil, nil)
+	q.QueueMsg("b", msgType(0), nil, nil)
+	q.QueueMsg("c", msgType(0), nil, nil)
 
 	require.Equal(t, 3, q.Len(), "bad queue length")
 
@@ -71,7 +71,7 @@ func TestBroadcast_QueueMsg(t *testing.T) {
 	require.Equal(t, "a", dump[2].name, "item 2 is not a")
 
 	// should invalidate old msg
-	q.QueueMsg("c", 0, []byte("msg"), nil)
+	q.QueueMsg("c", msgType(0), []byte("msg"), nil)
 
 	require.Equal(t, 3, q.Len(), "bad queue length")
 
@@ -85,10 +85,10 @@ func TestBroadcast_QueueMsg(t *testing.T) {
 
 func TestBroadcast_GetMessages(t *testing.T) {
 	q := &TransmitCapQueue{TransmitScale: 3, NumNodes: func() int { return 10 }, queue: *heap.NewHeap(), exists: map[string]*TransmitCapItem{}}
-	q.QueueMsg("", 0, []byte("1. this is a test."), nil) // 20 bytes each msg after encoding
-	q.QueueMsg("", 0, []byte("2. this is a test."), nil)
-	q.QueueMsg("", 0, []byte("3. this is a test."), nil)
-	q.QueueMsg("", 0, []byte("4. this is a test."), nil)
+	q.QueueMsg("", msgType(0), []byte("1. this is a test."), nil) // 20 bytes each msg after encoding
+	q.QueueMsg("", msgType(0), []byte("2. this is a test."), nil)
+	q.QueueMsg("", msgType(0), []byte("3. this is a test."), nil)
+	q.QueueMsg("", msgType(0), []byte("4. this is a test."), nil)
 
 	msgs := q.GetMessages(2, 88)
 
@@ -104,10 +104,10 @@ func TestBroadcast_TransmitLimit(t *testing.T) {
 	require.Equal(t, 2, transmitLimit(q.TransmitScale, q.NumNodes()), "transmit limit is not sane")
 	require.Equal(t, uint64(0), q.idSeq, "initial idSeqNo is 0")
 
-	q.QueueMsg("", 0, []byte("1. this is a test."), nil) // 20 bytes each msg after encoding
-	q.QueueMsg("", 0, []byte("2. this is a test."), nil)
-	q.QueueMsg("", 0, []byte("3. this is a test."), nil)
-	q.QueueMsg("", 0, []byte("4. this is a test."), nil)
+	q.QueueMsg("", msgType(0), []byte("1. this is a test."), nil) // 20 bytes each msg after encoding
+	q.QueueMsg("", msgType(0), []byte("2. this is a test."), nil)
+	q.QueueMsg("", msgType(0), []byte("3. this is a test."), nil)
+	q.QueueMsg("", msgType(0), []byte("4. this is a test."), nil)
 
 	// get messages until queue is empty
 

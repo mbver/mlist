@@ -107,7 +107,7 @@ func transmitLimit(scale, n int) int {
 	return scale * nodeScale
 }
 
-func (q *TransmitCapQueue) QueueMsg(name string, t msgType, msg interface{}, notify chan<- struct{}) {
+func (q *TransmitCapQueue) QueueMsg(name string, t MsgType, msg interface{}, notify chan<- struct{}) {
 	q.l.Lock()
 	defer q.l.Unlock()
 

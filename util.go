@@ -24,9 +24,9 @@ func init() {
 	seed.Init()
 }
 
-func encode(t msgType, in interface{}) ([]byte, error) {
+func encode(t MsgType, in interface{}) ([]byte, error) {
 	buf := bytes.NewBuffer(nil)
-	buf.WriteByte(uint8(t))
+	buf.WriteByte(uint8(t.Code()))
 	h := codec.MsgpackHandle{}
 	enc := codec.NewEncoder(buf, &h)
 	if err := enc.Encode(in); err != nil {

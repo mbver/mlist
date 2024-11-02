@@ -13,6 +13,11 @@ import (
 	"github.com/hashicorp/go-msgpack/v2/codec"
 )
 
+type MsgType interface {
+	Code() int
+	String() string
+}
+
 type msgType int
 
 const (
@@ -31,6 +36,10 @@ const (
 	hasCrcMsg
 	errMsg
 )
+
+func (t msgType) Code() int {
+	return int(t)
+}
 
 func (t msgType) String() string {
 	switch t {
