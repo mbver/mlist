@@ -311,6 +311,14 @@ func (m *Memberlist) sendUdp(addr *net.UDPAddr, msg []byte) error {
 	return err
 }
 
+func (m *Memberlist) SendUserMsg(addr *net.UDPAddr, msg []byte) error {
+	buf := make([]byte, 1, len(msg)+1)
+	buf[0] = byte(userMsg)
+	buf = append(buf, msg...)
+
+	return m.sendUdp(addr, buf)
+}
+
 func (m *Memberlist) sendTcp(conn net.Conn, msg []byte, streamLabel string) error {
 	msg, err := m.packTcp(msg, streamLabel)
 	if err != nil {
