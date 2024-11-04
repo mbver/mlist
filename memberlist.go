@@ -151,7 +151,7 @@ func (b *MemberlistBuilder) Build() (*Memberlist, error) {
 		suspicions: map[string]*suspicion{},
 		probeIdx:   -1,
 	}
-	m.mbroadcasts = NewBroadcastQueue(m.getNumNodes, m.config.RetransmitMult)
+	m.mbroadcasts = NewBroadcastQueue(m.GetNumNodes, m.config.RetransmitMult)
 
 	if err = m.start(); err != nil {
 		m.Shutdown()
@@ -342,7 +342,7 @@ func (m *Memberlist) ActiveNodes() []*Node {
 	return nodes
 }
 
-func (m *Memberlist) getNumNodes() int {
+func (m *Memberlist) GetNumNodes() int {
 	return int(atomic.LoadInt32(&m.numNodes))
 }
 

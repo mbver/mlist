@@ -551,13 +551,13 @@ func TestMemberlist_Reap(t *testing.T) {
 
 	m.reap()
 
-	require.Equal(t, 4, m.getNumNodes())
+	require.Equal(t, 4, m.GetNumNodes())
 
 	m.nodeL.Lock()
 	m.nodeMap["test2"].StateChange = time.Now().Add(-2 * m.config.DeadNodeExpiredTimeout)
 	m.nodeL.Unlock()
 
 	m.reap()
-	require.Equal(t, 3, m.getNumNodes())
+	require.Equal(t, 3, m.GetNumNodes())
 	require.Nil(t, m.GetNodeState("test2"))
 }

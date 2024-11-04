@@ -56,7 +56,7 @@ func TestPushPull_MergeState(t *testing.T) {
 
 	m.mergeState(remote)
 
-	require.Equal(t, 5, m.getNumNodes())
+	require.Equal(t, 5, m.GetNumNodes())
 	node := m.GetNodeState("test0")
 	if node.State != StateAlive || node.Lives != 2 {
 		t.Fatalf("bad node %+v", node)

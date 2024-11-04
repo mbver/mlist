@@ -216,7 +216,7 @@ func (m *Memberlist) suspectNode(s *suspect) {
 
 	// create a suspicion timer
 	confirmCap := m.config.SuspicionMult - 1
-	n := m.getNumNodes()
+	n := m.GetNumNodes()
 	if n-1 < confirmCap {
 		confirmCap = 1
 	}

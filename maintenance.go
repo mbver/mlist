@@ -43,7 +43,7 @@ func (m *Memberlist) scheduleFuncWithScale(interval time.Duration, stopCh chan s
 	jitter := time.Duration(uint64(rand.Int63()) % uint64(interval))
 	time.Sleep(jitter) // wait random fraction of interval to avoid thundering herd
 	for {
-		scaledInterval := scaleFunc(interval, m.getNumNodes())
+		scaledInterval := scaleFunc(interval, m.GetNumNodes())
 		select {
 		case <-time.After(scaledInterval):
 			f()
