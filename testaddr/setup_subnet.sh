@@ -25,7 +25,7 @@ case $OSTYPE in
 esac
 
 # first loopback, use intensively
-for ((i=10;i<256;i++))
+for ((i=10;i<158;i++))
   do
       if [ "$action" = "up" ]
       then

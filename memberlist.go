@@ -387,3 +387,7 @@ func (m *Memberlist) ID() string {
 func (m *Memberlist) Health() int {
 	return m.awr.GetHealth()
 }
+
+func (m *Memberlist) GossipInterval() time.Duration {
+	return m.config.GossipInterval
+}
