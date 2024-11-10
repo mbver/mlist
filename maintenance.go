@@ -158,7 +158,7 @@ func (m *Memberlist) probeNode(node *nodeState) {
 	indirectCh := m.IndirectPing(node, timeout)
 	tcpCh := m.TcpPing(node, timeout)
 	var indirectRes indirectPingResult
-	tm := time.NewTimer(timeout + m.config.MaxRTT)
+	waitTimeout := time.After(timeout + m.config.MaxRTT)
 WAIT:
 	for {
 		select {
@@ -172,7 +172,7 @@ WAIT:
 				success = true
 				break WAIT
 			}
-		case <-tm.C:
+		case <-waitTimeout:
 			break WAIT
 		}
 	}

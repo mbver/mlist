@@ -300,7 +300,7 @@ func TestMemberlist_Join_DeadNode(t *testing.T) {
 
 func waitForCond(check func() bool) bool {
 	t := time.NewTicker(5 * time.Millisecond)
-	tm := time.NewTimer(20 * time.Second)
+	timeout := time.After(20 * time.Second)
 	defer t.Stop()
 	for {
 		select {
@@ -308,7 +308,7 @@ func waitForCond(check func() bool) bool {
 			if check() {
 				return true
 			}
-		case <-tm.C:
+		case <-timeout:
 			return false
 		}
 	}
