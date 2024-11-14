@@ -11,6 +11,10 @@ import (
 	"github.com/hashicorp/go-sockaddr"
 )
 
+const TagMaxSize = 512
+
+var ErrMaxTagSizeExceed = fmt.Errorf("max tag size exceeds")
+
 type Memberlist struct {
 	lives       uint32
 	awr         *awareness
@@ -205,6 +209,9 @@ func (m *Memberlist) hasPublicIface() (bool, error) {
 }
 
 func (m *Memberlist) setAlive() error {
+	if len(m.config.Tags) > TagMaxSize {
+		return ErrMaxTagSizeExceed
+	}
 	addr, port, err := m.GetAdvertiseAddr()
 	if err != nil {
 		return err
@@ -290,6 +297,9 @@ func (m *Memberlist) Leave() error {
 }
 
 func (m *Memberlist) UpdateTags(tags []byte) error {
+	if len(tags) > TagMaxSize {
+		return ErrMaxTagSizeExceed
+	}
 	// Get the existing node
 	m.nodeL.RLock()
 	node := m.nodeMap[m.ID()]
