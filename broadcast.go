@@ -149,6 +149,13 @@ func (q *TransmitCapQueue) Pop() *TransmitCapItem {
 	return res
 }
 
+func (q *TransmitCapQueue) Resize(size int) {
+	for q.Len() > size {
+		item := q.Pop()
+		item.Finish()
+	}
+}
+
 func (q *TransmitCapQueue) Len() int {
 	q.l.Lock()
 	defer q.l.Unlock()
