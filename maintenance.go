@@ -11,20 +11,20 @@ import (
 // call just once
 func (m *Memberlist) schedule() {
 	if m.config.ProbeInterval > 0 {
-		go m.scheduleFunc(m.config.ProbeInterval, m.shutdownCh, m.probe)
+		go scheduleFunc(m.config.ProbeInterval, m.shutdownCh, m.probe)
 	}
 	if m.config.GossipInterval > 0 && m.config.GossipNodes > 0 {
-		go m.scheduleFunc(m.config.GossipInterval, m.shutdownCh, m.gossip)
+		go scheduleFunc(m.config.GossipInterval, m.shutdownCh, m.gossip)
 	}
 	if m.config.ReapInterval > 0 {
-		go m.scheduleFunc(m.config.ReapInterval, m.shutdownCh, m.reap)
+		go scheduleFunc(m.config.ReapInterval, m.shutdownCh, m.reap)
 	}
 	if m.config.PushPullInterval > 0 {
 		go m.scheduleFuncWithScale(m.config.PushPullInterval, m.shutdownCh, pushPullScale, m.pushPull)
 	}
 }
 
-func (m *Memberlist) scheduleFunc(interval time.Duration, stopCh chan struct{}, f func()) {
+func scheduleFunc(interval time.Duration, stopCh chan struct{}, f func()) {
 	t := time.NewTicker(interval)
 	jitter := time.Duration(uint64(rand.Int63()) % uint64(interval))
 	time.Sleep(jitter) // wait random fraction of interval to avoid thundering herd
