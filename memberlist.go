@@ -352,6 +352,17 @@ func (m *Memberlist) ActiveNodes() []*Node {
 	return nodes
 }
 
+func (m *Memberlist) Members() []*Node {
+	m.nodeL.RLock()
+	defer m.nodeL.RUnlock()
+
+	nodes := make([]*Node, 0, len(m.nodes))
+	for _, n := range m.nodes {
+		nodes = append(nodes, n.Node.Clone())
+	}
+	return nodes
+}
+
 func (m *Memberlist) GetNumNodes() int {
 	return int(atomic.LoadInt32(&m.numNodes))
 }
