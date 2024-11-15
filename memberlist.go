@@ -231,7 +231,7 @@ func (m *Memberlist) Join(existing []string) (int, error) {
 	numSuccess := 0
 	var errs []error
 	for _, exist := range existing {
-		addrs, port, err := resolveAddr(exist, m.config.DNSConfigPath)
+		addrs, port, err := ResolveAddr(exist, m.config.DNSConfigPath)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("failed to resolve %s: %v", exist, err))
 			m.logger.Printf("[WARN] memberlist: %v", err)

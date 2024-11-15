@@ -348,7 +348,7 @@ func TestResolveAddr(t *testing.T) {
 		tc := tc // store the current variable as the we run test in parallel
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			ips, port, err := resolveAddr(tc.host, m.config.DNSConfigPath)
+			ips, port, err := ResolveAddr(tc.host, m.config.DNSConfigPath)
 			if tc.err {
 				require.Error(t, err)
 			} else {
@@ -472,7 +472,7 @@ func TestResolveAddr_TCP_First(t *testing.T) {
 	}
 
 	for _, host := range hosts {
-		ips, port, err := resolveAddr(host, m.config.DNSConfigPath)
+		ips, port, err := ResolveAddr(host, m.config.DNSConfigPath)
 		if err != nil {
 			t.Fatalf("err: %v", err)
 		}

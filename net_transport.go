@@ -595,7 +595,7 @@ func parsePort(s string) (string, uint16, error) {
 	return host, uint16(iport), nil
 }
 
-func resolveAddr(hostStr string, dnsConfPath string) ([]net.IP, uint16, error) {
+func ResolveAddr(hostStr string, dnsConfPath string) ([]net.IP, uint16, error) {
 	if !hasPort(hostStr) {
 		hostStr += ":0"
 	}
