@@ -284,7 +284,7 @@ func (m *Memberlist) Leave() error {
 	}
 	notifyCh := make(chan struct{})
 	m.deadNode(&d, notifyCh)
-	if m.NumActive() == 0 || m.config.BroadcastWaitTimeout == 0 {
+	if m.NumActive() <= 1 || m.config.BroadcastWaitTimeout == 0 {
 		return nil
 	}
 	// Block until the broadcast goes out
@@ -315,7 +315,7 @@ func (m *Memberlist) UpdateTags(tags []byte) error {
 	notifyCh := make(chan struct{})
 	m.aliveNode(&a, notifyCh)
 
-	if m.NumActive() == 0 || m.config.BroadcastWaitTimeout == 0 {
+	if m.NumActive() <= 1 || m.config.BroadcastWaitTimeout == 0 {
 		return nil
 	}
 	// Wait for the broadcast or a timeout
