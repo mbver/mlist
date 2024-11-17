@@ -284,7 +284,7 @@ func (m *Memberlist) Leave() error {
 	}
 	notifyCh := make(chan struct{})
 	m.deadNode(&d, notifyCh)
-	if m.NumActive() <= 1 || m.config.BroadcastWaitTimeout == 0 {
+	if !m.hasActivePeers() || m.config.BroadcastWaitTimeout == 0 {
 		return nil
 	}
 	// Block until the broadcast goes out
@@ -294,6 +294,17 @@ func (m *Memberlist) Leave() error {
 		return fmt.Errorf("timeout waiting for leave broadcast")
 	}
 	return nil
+}
+
+func (m *Memberlist) hasActivePeers() bool {
+	m.nodeL.Lock()
+	defer m.nodeL.Unlock()
+	for _, n := range m.nodes {
+		if !n.DeadOrLeft() && n.Node.ID != m.ID() {
+			return true
+		}
+	}
+	return false
 }
 
 func (m *Memberlist) UpdateTags(tags []byte) error {
@@ -315,7 +326,7 @@ func (m *Memberlist) UpdateTags(tags []byte) error {
 	notifyCh := make(chan struct{})
 	m.aliveNode(&a, notifyCh)
 
-	if m.NumActive() <= 1 || m.config.BroadcastWaitTimeout == 0 {
+	if !m.hasActivePeers() || m.config.BroadcastWaitTimeout == 0 {
 		return nil
 	}
 	// Wait for the broadcast or a timeout
