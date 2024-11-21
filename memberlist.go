@@ -350,14 +350,14 @@ func (m *Memberlist) NumActive() int {
 	return active
 }
 
-func (m *Memberlist) ActiveNodes() []*Node {
+func (m *Memberlist) ActiveNodes() []*nodeState {
 	m.nodeL.RLock()
 	defer m.nodeL.RUnlock()
 
-	nodes := make([]*Node, 0, len(m.nodes))
+	nodes := make([]*nodeState, 0, len(m.nodes))
 	for _, n := range m.nodes {
 		if !n.DeadOrLeft() {
-			nodes = append(nodes, n.Node.Clone())
+			nodes = append(nodes, n.Clone())
 		}
 	}
 	return nodes
