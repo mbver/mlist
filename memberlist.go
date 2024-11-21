@@ -363,13 +363,13 @@ func (m *Memberlist) ActiveNodes() []*Node {
 	return nodes
 }
 
-func (m *Memberlist) Members() []*Node {
+func (m *Memberlist) Members() []*nodeState {
 	m.nodeL.RLock()
 	defer m.nodeL.RUnlock()
 
-	nodes := make([]*Node, 0, len(m.nodes))
+	nodes := make([]*nodeState, 0, len(m.nodes))
 	for _, n := range m.nodes {
-		nodes = append(nodes, n.Node.Clone())
+		nodes = append(nodes, n.Clone())
 	}
 	return nodes
 }
