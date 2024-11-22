@@ -135,7 +135,8 @@ func TestPushPull_SendReceive(t *testing.T) {
 	nodes := m.ActiveNodes()
 	found := make([]bool, 3)
 	for i := range found {
-		for _, n := range nodes {
+		for _, ns := range nodes {
+			n := ns.Node
 			if n.ID == fmt.Sprintf("Test %d", i) {
 				if n.IP.String() != m.config.BindAddr {
 					continue

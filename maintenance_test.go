@@ -92,7 +92,8 @@ func TestMemberlist_PushPull(t *testing.T) {
 		nodes := m2.ActiveNodes()
 		found := make([]bool, 3)
 		for i := range found {
-			for _, n := range nodes {
+			for _, ns := range nodes {
+				n := ns.Node
 				if n.ID == fmt.Sprintf("Test %d", i) {
 					if n.IP.String() != m1.config.BindAddr {
 						continue
@@ -148,7 +149,7 @@ func TestMemberlist_Gossip(t *testing.T) {
 			if m.NumActive() != 3 {
 				return false, "expect 3 active nodes"
 			}
-			nodes := m.ActiveNodes()
+			nodes := toNodes(m.ActiveNodes())
 			found := []bool{false, false, false}
 			for _, n1 := range nodes {
 				for i, n2 := range []*Node{node1.Node, node2.Node, node3.Node} {
@@ -199,7 +200,8 @@ func TestMemberlist_GossipToDead(t *testing.T) {
 			return false, "expect 2 active nodes"
 		}
 		nodes := m2.ActiveNodes()
-		for _, n := range nodes {
+		for _, ns := range nodes {
+			n := ns.Node
 			if n.ID == m1.ID() && n.IP.String() == m1.config.BindAddr {
 				return true, ""
 			}

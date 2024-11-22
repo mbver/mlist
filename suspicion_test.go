@@ -68,16 +68,19 @@ func TestSuspicion_Confirm(t *testing.T) {
 		new  bool
 	}
 	cases := []struct {
+		name      string
 		confirms  []confirm
 		expected  time.Duration
 		nconfirms int
 	}{
 		{
+			"no confirm ",
 			[]confirm{},
 			maxTimeout,
 			1,
 		},
 		{
+			"1 confirm",
 			[]confirm{
 				{"me", false},
 				{"foo", true},
@@ -86,6 +89,7 @@ func TestSuspicion_Confirm(t *testing.T) {
 			2,
 		},
 		{
+			"1 confirm 2",
 			[]confirm{
 				{"me", false},
 				{"foo", true},
@@ -96,6 +100,7 @@ func TestSuspicion_Confirm(t *testing.T) {
 			2,
 		},
 		{
+			"2 confirms",
 			[]confirm{
 				{"me", false},
 				{"foo", true},
@@ -105,6 +110,7 @@ func TestSuspicion_Confirm(t *testing.T) {
 			3,
 		},
 		{
+			"3 confirms",
 			[]confirm{
 				{"me", false},
 				{"foo", true},
@@ -115,6 +121,7 @@ func TestSuspicion_Confirm(t *testing.T) {
 			4,
 		},
 		{
+			"3 confirms 2",
 			[]confirm{
 				{"me", false},
 				{"foo", true},
@@ -127,50 +134,52 @@ func TestSuspicion_Confirm(t *testing.T) {
 		},
 	}
 	for i, c := range cases {
-		ch := make(chan struct{}, 1)
-		f := func(confirms int) {
-			if confirms != c.nconfirms {
-				t.Errorf("case %d: bad %d != %d", i, confirms, c.nconfirms)
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			ch := make(chan struct{}, 1)
+			f := func(confirms int) {
+				if confirms != c.nconfirms {
+					t.Errorf("case %d: bad %d != %d", i, confirms, c.nconfirms)
+				}
+
+				ch <- struct{}{} // for logging
+			}
+			s := newSuspicion(minTimeout, maxTimeout, cap, me, f)
+			fudge := 25 * time.Millisecond
+			for _, p := range c.confirms {
+				time.Sleep(fudge)
+				if s.Confirm(p.from) != p.new {
+					t.Fatalf("case %d: newInfo mismatch for %s", i, p.from)
+				}
 			}
 
-			ch <- struct{}{} // for logging
-		}
+			// Wait until right before the timeout and make sure the
+			// timer hasn't fired.
+			already := time.Duration(len(c.confirms)) * fudge
+			time.Sleep(c.expected - already - fudge)
+			select {
+			case <-ch:
+				t.Fatalf("case %d: should not have fired", i)
+			default:
+			}
 
-		s := newSuspicion(minTimeout, maxTimeout, cap, me, f)
-		fudge := 25 * time.Millisecond
-		for _, p := range c.confirms {
+			// Wait through the timeout and a little after and make sure it
+			// fires.
+			time.Sleep(2 * fudge)
+			select {
+			case <-ch:
+			default:
+				t.Fatalf("case %d: should have fired", i)
+			}
+
+			// late confirm has no effect
+			s.Confirm("late")
 			time.Sleep(fudge)
-			if s.Confirm(p.from) != p.new {
-				t.Fatalf("case %d: newInfo mismatch for %s", i, p.from)
+			select {
+			case <-ch:
+				t.Fatalf("case %d: should not have fired", i)
+			default:
 			}
-		}
-
-		// Wait until right before the timeout and make sure the
-		// timer hasn't fired.
-		already := time.Duration(len(c.confirms)) * fudge
-		time.Sleep(c.expected - already - fudge)
-		select {
-		case <-ch:
-			t.Fatalf("case %d: should not have fired", i)
-		default:
-		}
-
-		// Wait through the timeout and a little after and make sure it
-		// fires.
-		time.Sleep(2 * fudge)
-		select {
-		case <-ch:
-		default:
-			t.Fatalf("case %d: should have fired", i)
-		}
-
-		// late confirm has no effect
-		s.Confirm("late")
-		time.Sleep(fudge)
-		select {
-		case <-ch:
-			t.Fatalf("case %d: should not have fired", i)
-		default:
-		}
+		})
 	}
 }

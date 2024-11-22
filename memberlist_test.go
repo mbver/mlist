@@ -107,7 +107,7 @@ func TestMemberlist_ActiveNodes(t *testing.T) {
 	}
 	m.nodes = nodes
 
-	members := m.ActiveNodes()
+	members := toNodes(m.ActiveNodes())
 	if !reflect.DeepEqual(members, []*Node{n1, n3}) {
 		t.Fatalf("bad members")
 	}
@@ -120,7 +120,7 @@ func TestMemberlist_Create(t *testing.T) {
 	}
 	require.Nil(t, err)
 	require.Equal(t, m.NumActive(), 1)
-	require.Equal(t, m.ActiveNodes()[0].ID, m.ID())
+	require.Equal(t, m.ActiveNodes()[0].Node.ID, m.ID())
 }
 
 func sortNodes(nodes []*Node) {
@@ -129,12 +129,20 @@ func sortNodes(nodes []*Node) {
 	})
 }
 
+func toNodes(states []*nodeState) []*Node {
+	nodes := make([]*Node, len(states))
+	for i, s := range states {
+		nodes[i] = s.Node
+	}
+	return nodes
+}
+
 func testJoinState(t *testing.T, mlists ...*Memberlist) {
-	nodes0 := mlists[0].ActiveNodes()
+	nodes0 := toNodes(mlists[0].ActiveNodes())
 	sortNodes(nodes0)
 	for _, m := range mlists {
 		require.Equal(t, m.NumActive(), len(mlists))
-		nodes := m.ActiveNodes()
+		nodes := toNodes(m.ActiveNodes())
 		sortNodes(nodes)
 		if !reflect.DeepEqual(nodes0, nodes) {
 			t.Fatalf("nodes not matching")
