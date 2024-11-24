@@ -6,37 +6,37 @@ import (
 )
 
 type Config struct {
-	ID                      string // use a unique id instead of name
-	BindAddr                string
-	BindPort                int
-	AdvertiseAddr           string
-	AdvertisePort           int
-	CIDRsAllowed            []net.IPNet
-	Label                   string
-	UDPBufferSize           int // maximum size of a udp packet
-	DNSConfigPath           string
-	EnableCompression       bool
-	EncryptionVersion       encryptionVersion
-	TcpTimeout              time.Duration
-	NumIndirectChecks       int
-	PingTimeout             time.Duration
-	ProbeInterval           time.Duration
-	MaxRTT                  time.Duration
-	GossipNodes             int
-	GossipInterval          time.Duration
-	DeadNodeExpiredTimeout  time.Duration
-	BroadcastWaitTimeout    time.Duration
-	EventTimeout            time.Duration
-	ReapInterval            time.Duration
-	MaxPushPulls            int
-	PushPullInterval        time.Duration
-	MaxAwarenessHealth      int
-	SuspicionMult           int
-	SuspicionMaxTimeoutMult int
-	MaxLongRunQueueDepth    int
-	QueueCheckInterval      time.Duration
-	RetransmitMult          int
-	Tags                    []byte
+	ID                      string            `yaml:"id"`
+	BindAddr                string            `yaml:"bind_addr"`
+	BindPort                int               `yaml:"bind_port"`
+	AdvertiseAddr           string            `yaml:"advertise_addr"`
+	AdvertisePort           int               `yaml:"advertise_port"`
+	CIDRsAllowed            []net.IPNet       `yaml:"cidrs_allowed"`
+	Label                   string            `yaml:"label"`
+	UDPBufferSize           int               `yaml:"udp_buffer_size"`
+	DNSConfigPath           string            `yaml:"dns_config_path"`
+	EnableCompression       bool              `yaml:"enable_compression"`
+	EncryptionVersion       encryptionVersion `yaml:"encryption_version"`
+	TcpTimeout              time.Duration     `yaml:"tcp_timeout"`
+	NumIndirectChecks       int               `yaml:"num_indirect_checks"`
+	PingTimeout             time.Duration     `yaml:"ping_timeout"`
+	ProbeInterval           time.Duration     `yaml:"probe_interval"`
+	MaxRTT                  time.Duration     `yaml:"max_rtt"`
+	GossipNodes             int               `yaml:"gossip_nodes"`
+	GossipInterval          time.Duration     `yaml:"gossip_interval"`
+	DeadNodeExpiredTimeout  time.Duration     `yaml:"deadnode_expired_timeout"`
+	BroadcastWaitTimeout    time.Duration     `yaml:"broadcast_wait_timeout"`
+	EventTimeout            time.Duration     `yaml:"event_timeout"`
+	ReapInterval            time.Duration     `yaml:"reap_interval"`
+	MaxPushPulls            int               `yaml:"max_pushpulls"` // num of maximum concurrent pushpulls
+	PushPullInterval        time.Duration     `yaml:"pushpull_interval"`
+	MaxAwarenessHealth      int               `yaml:"max_awareness_health"`
+	SuspicionMult           int               `yaml:"suspicion_mult"`
+	SuspicionMaxTimeoutMult int               `yaml:"suspicion_max_timeout_mult"`
+	MaxLongRunQueueDepth    int               `yaml:"max_longrun_queue_depth"`
+	QueueCheckInterval      time.Duration     `yaml:"queue_check_interval"`
+	RetransmitMult          int               `yaml:"retransmit_mult"`
+	Tags                    []byte            `yaml:"tags"` // to be overwritten with serf's tag
 }
 
 func DefaultLANConfig() *Config {
