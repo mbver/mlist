@@ -69,7 +69,7 @@ func (a *AddressList) NextAvailAddr() (ip net.IP, cleanUpFn func()) {
 	for {
 		attempts++
 		if attempts == 20 {
-			panic("no available address")
+			panic("no available address. make sure setup_subnet.sh is run on MacOS")
 		}
 		ip = a.NextAddr()
 
