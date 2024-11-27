@@ -3,6 +3,8 @@ package memberlist
 import (
 	"bytes"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 var TestKeys [][]byte = [][]byte{
@@ -150,4 +152,16 @@ func TestKeyRing_MultiKeyEncryptDecrypt(t *testing.T) {
 	if err == nil {
 		t.Fatalf("Expected no keys to decrypt message")
 	}
+}
+
+func TestKeyRing_AlwaysDumpPrimaryKeyFirst(t *testing.T) {
+	kr, err := NewKeyring(TestKeys, TestKeys[0])
+	require.Nil(t, err)
+	keys := kr.GetKeys()
+	require.True(t, bytes.Equal(keys[0], TestKeys[0]))
+	require.Equal(t, 3, len(keys))
+	kr.UseKey(TestKeys[2])
+	keys = kr.GetKeys()
+	require.True(t, bytes.Equal(keys[0], TestKeys[2]))
+	require.Equal(t, 3, len(keys))
 }
