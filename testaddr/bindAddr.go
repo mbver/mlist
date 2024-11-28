@@ -15,7 +15,7 @@ const testPort = 10101
 
 // maybe add addresses with different masks too?
 func init() {
-	BindAddrs = newAddressList(10, 255)
+	BindAddrs = newAddressList(10, 128)
 }
 
 // create an AddressList from 127.0.0.from to 127.0.0.to excluded
