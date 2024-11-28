@@ -46,6 +46,7 @@ func DefaultLANConfig() *Config {
 		BindPort:                7946,
 		AdvertiseAddr:           "",
 		AdvertisePort:           7946,
+		CIDRsAllowed:            []net.IPNet{},
 		UDPBufferSize:           1400,
 		DNSConfigPath:           "/etc/resolv.conf",
 		EnableCompression:       true,
@@ -69,5 +70,6 @@ func DefaultLANConfig() *Config {
 		MaxLongRunQueueDepth:    1024,
 		QueueCheckInterval:      30 * time.Second,
 		RetransmitMult:          4,
+		Tags:                    []byte{},
 	}
 }
