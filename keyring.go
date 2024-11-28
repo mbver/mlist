@@ -90,6 +90,9 @@ func (r *Keyring) RemoveKey(key []byte) error {
 func (r *Keyring) GetKeys() [][]byte {
 	r.lock.Lock()
 	defer r.lock.Unlock()
+	if r.primaryKey == nil {
+		return [][]byte{}
+	}
 	keys := make([][]byte, 0, len(r.keys))
 	keys = append(keys, copyBytes(r.primaryKey))
 	for _, k := range r.keys {
