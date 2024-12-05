@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"sync/atomic"
 	"time"
-
-	"math/rand"
 )
 
 // call just once
@@ -26,7 +24,7 @@ func (m *Memberlist) schedule() {
 
 func scheduleFunc(interval time.Duration, stopCh chan struct{}, f func()) {
 	t := time.NewTicker(interval)
-	jitter := time.Duration(uint64(rand.Int63()) % uint64(interval))
+	jitter := time.Duration(uint64(rnd.Int63()) % uint64(interval))
 	time.Sleep(jitter) // wait random fraction of interval to avoid thundering herd
 	for {
 		select {
@@ -40,7 +38,7 @@ func scheduleFunc(interval time.Duration, stopCh chan struct{}, f func()) {
 }
 
 func (m *Memberlist) scheduleFuncWithScale(interval time.Duration, stopCh chan struct{}, scaleFunc func(time.Duration, int) time.Duration, f func()) {
-	jitter := time.Duration(uint64(rand.Int63()) % uint64(interval))
+	jitter := time.Duration(uint64(rnd.Int63()) % uint64(interval))
 	time.Sleep(jitter) // wait random fraction of interval to avoid thundering herd
 	for {
 		scaledInterval := scaleFunc(interval, m.GetNumNodes())

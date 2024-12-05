@@ -3,11 +3,13 @@ package memberlist
 import (
 	"bytes"
 	"compress/lzw"
+	crand "crypto/rand"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"math"
+	"math/big"
 	"math/rand"
 	"net"
 	"strconv"
@@ -16,12 +18,16 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-msgpack/v2/codec"
-	"github.com/sean-/seed"
 )
 
-func init() {
-	// Seed the random number generator
-	seed.Init()
+var rnd = rand.New(rand.NewSource(newSeed()))
+
+func newSeed() int64 {
+	r, err := crand.Int(crand.Reader, big.NewInt(math.MaxInt64))
+	if err != nil {
+		panic(fmt.Errorf("failed to read random bytes: %v", err))
+	}
+	return r.Int64()
 }
 
 func encode(t MsgType, in interface{}) ([]byte, error) {
@@ -108,12 +114,12 @@ func randIntN(n int) int {
 	if n == 0 { // if n == 0, modulo will panic
 		return 0
 	}
-	return int(rand.Uint32() % uint32(n))
+	return int(rnd.Uint32() % uint32(n))
 }
 
 func shuffleNodes(nodes []*nodeState) {
 	n := len(nodes)
-	rand.Shuffle(n, func(i, j int) {
+	rnd.Shuffle(n, func(i, j int) {
 		nodes[i], nodes[j] = nodes[j], nodes[i]
 	})
 }
