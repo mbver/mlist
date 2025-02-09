@@ -6,6 +6,7 @@ package memberlist
 import (
 	"fmt"
 	"net"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,14 +14,19 @@ import (
 )
 
 type mockUserStateDelegate struct {
+	l     sync.Mutex
 	local string
 }
 
 func (u *mockUserStateDelegate) LocalState() []byte {
+	u.l.Lock()
+	defer u.l.Unlock()
 	return []byte(u.local)
 }
 
 func (u *mockUserStateDelegate) Merge(s []byte) {
+	u.l.Lock()
+	defer u.l.Unlock()
 	u.local += string(s)
 }
 

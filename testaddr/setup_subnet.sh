@@ -1,4 +1,8 @@
+# Copyright (c) HashiCorp, Inc.
+# Copyright (c) 2024 Phuoc Phi
+# SPDX-License-Identifier: MPL-2.0
 #!/bin/bash
+
 
 # Check if loopback is setup
 action=${1:-up}

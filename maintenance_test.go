@@ -65,8 +65,8 @@ func TestMemberlist_PushPull(t *testing.T) {
 	defer cleanup()
 	require.Nil(t, err)
 
-	m1.usrState = &mockUserStateDelegate{m1.config.ID}
-	m2.usrState = &mockUserStateDelegate{m2.config.ID}
+	m1.usrState = &mockUserStateDelegate{local: m1.config.ID}
+	m2.usrState = &mockUserStateDelegate{local: m2.config.ID}
 	joinAndTest(t, m1, m2)
 
 	// user state exchanged
